@@ -1,0 +1,12 @@
+*.xlsx
+*.xls
+*.dta
+*.xlsm
+*.zip
+*.log
+*.csv
+Fall 2017/
+*.DS_Store
+*.spyproject
+Analysis/output/*
+
