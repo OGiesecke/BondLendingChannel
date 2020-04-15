@@ -60,6 +60,7 @@ print("Default data defined")
 ## Generate the US sample data from the rawdata
 dofile = 'DefineOutput_US'
 run_stata(dofile,directory)
+print("US data defined")
 
 # Generate the rolling beta regressions
 start_time = time.time()
