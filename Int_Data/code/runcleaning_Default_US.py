@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Jun  1 12:34:57 2019
-@author: olivergiesecke
-"""
-
 
 ###############################################################################
 ### Import Python packages ###

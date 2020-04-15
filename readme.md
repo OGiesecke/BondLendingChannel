@@ -37,7 +37,7 @@ The following scripts have been executed with Matlab R2019a, Stata/SE 16.1 and P
 
 ## Data assembly
 
-The data assembly consists of multiple scripts and is conducted in the directory Raw_Data. The file *run_US_Default.py* in Raw_Data/code runs the entire directory. The file requires to specify the local directory on the machine; this path will be transferred to he Stata do files and all other directories are defined as relative directories. The file executes the following scripts:
+The data assembly consists of multiple scripts and is conducted in the directory Raw_Data. The file *run_US_Default.py* in Raw_Data/code runs the entire directory. The file executes the following scripts. The data output is collected in a separate directory Raw_Data/data that is also created in the process. Finally the directory Raw_Data/log_file is created to collect all the log files.
 
 ```
 - CreateSharedData.do
@@ -50,7 +50,7 @@ The data assembly consists of multiple scripts and is conducted in the directory
 
 ## Data cleaning and merging
 
-The data cleaning and merging consists of multiple scripts and is conducted in the directory Int_Data. The file *runcleaning_Default_US.py* in Int_Data/code runs the entire directory consisting of following scripts:
+The data cleaning and merging consists of multiple scripts and is conducted in the directory Int_Data. The file *runcleaning_Default_US.py* in Int_Data/code runs the entire directory consisting of following scripts. The data output is collected in a separate directory Int_Data/data that is also created in the process. Finally the directory Int_Data/log_file is created to collect all the log files.
 
 ```
 - DefineOutput_Default.do
@@ -74,7 +74,7 @@ The data cleaning and merging consists of multiple scripts and is conducted in t
 
 ## Analysis
 
-The file *Run_Analysis.py* runs the analysis and creates all tables and figures of the paper. It executes the following files:
+The file *Run_Analysis.py* runs the analysis and creates all tables and figures of the paper. The output is collected in a separate directory Analysis/output that is also created in the process. Finally the directory Analysis/log_file is created to collect all the log files. It executes the following files:
 
 ```
 - Rating_Downgrades.do
@@ -87,8 +87,8 @@ The file *Run_Analysis.py* runs the analysis and creates all tables and figures 
 
 ## Final Sample
 
-The file *Default_finalsample.csv* contains the final sample of the EURO STOXX sectoral indices constituents--excluding financials and utilities and removing some observation for the lack of data.
+The file *Default_finalsample.csv* in the directory Data_Files/ contains the final sample of the EURO STOXX sectoral indices constituents--excluding financials and utilities and removing some observation for the lack of data.
 
 ## Manually collected capital structure data
 
-The file *CapitalStructure_manual.xlsx* contains the manually collected market debt data for the years 2000 and 2001.
+The file *CapitalStructure_manual.xlsx* in the directory Data_Files/ contains the manually collected market debt data for the years 2000 and 2001.

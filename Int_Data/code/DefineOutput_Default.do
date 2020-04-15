@@ -247,22 +247,6 @@ program gen_ratings
 	save ../data/Default_fullratingpanel,replace 
 end
 
-*************************************************
-** Clean the ratings from Bloomberg
-*************************************************
-
-
-program gen_ratings
-	import delimited ../data/Default_fullrating.csv, clear
-	rename date datestring
-	gen date = date(datestring,"MDY")
-	format date %td
-	keep isin date n_mean_rating mean_rating
-	gen year = year(date)
-	gen yr_adj = year
-	
-	save ../data/Default_fullratingpanel,replace 
-end
 
 *************************************************
 ** Get sample restrictions
