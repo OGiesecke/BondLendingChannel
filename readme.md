@@ -37,7 +37,7 @@ The following scripts have been executed with Matlab R2019a, Stata/SE 16.1 and P
 
 ## Data assembly
 
-The data assembly consists of multiple scripts and is conducted in the directory Raw_Data. The file *run_US_Default.py* in Raw_Data/code runs the entire directory. The file executes the following scripts. The data output is collected in a separate directory Raw_Data/data that is also created in the process. Finally the directory Raw_Data/log_file is created to collect all the log files.
+The data assembly consists of multiple scripts and is conducted in the directory Raw_Data. The file *run_US_Default.py* in Raw_Data/code runs the entire directory. The data output is collected in a separate directory Raw_Data/data that is also created in the process. Finally the directory Raw_Data/log_file is created to collect all the log files.  The file executes the following scripts:
 
 ```
 - CreateSharedData.do
@@ -50,7 +50,7 @@ The data assembly consists of multiple scripts and is conducted in the directory
 
 ## Data cleaning and merging
 
-The data cleaning and merging consists of multiple scripts and is conducted in the directory Int_Data. The file *runcleaning_Default_US.py* in Int_Data/code runs the entire directory consisting of following scripts. The data output is collected in a separate directory Int_Data/data that is also created in the process. Finally the directory Int_Data/log_file is created to collect all the log files.
+The data cleaning and merging consists of multiple scripts and is conducted in the directory Int_Data. The file *runcleaning_Default_US.py* in Int_Data/code runs the entire directory. The data output is collected in a separate directory Int_Data/data that is also created in the process. Finally the directory Int_Data/log_file is created to collect all the log files. The file executes the following scripts:
 
 ```
 - DefineOutput_Default.do
