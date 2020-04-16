@@ -7,9 +7,12 @@ import sys
 import pathlib
 
 ###############################################################################
+def run_stata(dofile,directory):
+    print(f"\"{directory}\"")
+    cmd = ["stata-se", '-b', "do", dofile, f"\"{directory}\"", "&"]
+    subprocess.run(cmd)
 
-
-## Set the working directory
+## Set the working directory 
 directory=str(pathlib.Path().absolute())
 print(f"The script is executed on path: {directory}")
 push = 1
@@ -27,7 +30,10 @@ if not os.path.isdir("../log_file/"):
 
 ## Clear old files and push the data from the Int_Data folder
 if push ==1:
-    os.system('rm  ../data/*')
+    try:
+        os.system('rm  ../data/*')
+    except:
+        print('No pre-existing data available')   
     print("Data and outputs cleared")
     os.system('cp ../../Int_Data/data/Firm_Return_WS_Bond_Duration_Data_Default_Sample.dta ../data')
     print('Default sample data pushed')
@@ -42,36 +48,27 @@ except:
 
 ## Run the analysis with the master data
 dofile = 'DoAnalysis_Default.do'
-cmd = ["stata-se", '-b', "do", dofile, directory, "&"]
-subprocess.run(cmd)
+run_stata(dofile,directory)
 print('Default Analysis is done')
 
 dofile = 'DoAnalysis_US.do'
-cmd = ["stata-se", '-b', "do", dofile, directory, "&"]
-subprocess.run(cmd)
+run_stata(dofile,directory)
 print('US Analysis is done')
 
-# =============================================================================
-# dofile = 'Rating_Downgrades.do'
-# cmd = ["stata-se", '-b', "do", dofile, directory, "&"]
-# subprocess.run(cmd)
-# print('Rating downgrades is done')
-#
-# =============================================================================
+dofile = 'Rating_Downgrades.do'
+run_stata(dofile,directory)
+print('Rating downgrades is done') 
 
 dofile = 'DoLP_Default.do'
-cmd = ["stata-se", '-b', "do", dofile, directory, "&"]
-subprocess.run(cmd)
+run_stata(dofile,directory)
 print('Local projection is done')
 
 dofile = 'Do_lp_bloombergbond.do'
-cmd = ["stata-se", '-b', "do", dofile, directory, "&"]
-subprocess.run(cmd)
+run_stata(dofile,directory)
 print('Bond LP is done')
 
 dofile = 'Do_MacroTimeSeries.do'
-cmd = ["stata-se", '-b', "do", dofile, directory, "&"]
-subprocess.run(cmd)
+run_stata(dofile,directory)
 print('Macro time series is done')
 
 ## Move the log files
@@ -79,3 +76,5 @@ try:
     os.system('mv *.log ../log_file/')
 except:
     print('No log file')
+
+

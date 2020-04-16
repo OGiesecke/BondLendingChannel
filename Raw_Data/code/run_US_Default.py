@@ -9,6 +9,10 @@ import numpy as np
 import pathlib
 
 ###############################################################################
+def run_stata(dofile,directory):
+    cmd = ["stata-se", '-b', "do", dofile, f"\"{directory}\"", "&"]
+    subprocess.run(cmd)
+
 ## Set the working directory 
 directory=str(pathlib.Path().absolute())
 print(f"The script is executed on path: {directory}")
@@ -42,17 +46,13 @@ os.system("python create_fullrating_Default.py")
 os.system("python create_fullrating_US.py")
 
 dofile = 'CreateData_US'
-cmd = ["stata-se", '-b', "do", dofile, f"\"{directory}\"", "&"]
-subprocess.run(cmd)
+run_stata(dofile,directory)
 
 dofile = 'CreateData_Default'
-cmd = ["stata-se", '-b', "do", dofile, f"\"{directory}\"", "&"]
-subprocess.run(cmd)
+run_stata(dofile,directory)
 
 dofile = 'CreateSharedData'
-cmd = ["stata-se", '-b', "do", dofile, f"\"{directory}\"", "&"]
-subprocess.run(cmd)
-
+run_stata(dofile,directory)
 
 ## Move all the log files
 os.system('mv *.log ../log_file')
