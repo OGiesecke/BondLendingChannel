@@ -211,11 +211,7 @@ axis(2)) xlabel(2000(5)2015)  ytitle("Fraction sample as of total BIS",axis(2)))
 name(Coverage,replace) xtitle("")
 graph export ../output/Default_SampleCovDebtSec.pdf,replace
 
-*reg issue_nonfincorp_fx IQ_BONDS_NOTES if year > 2000
-*twoway scatter issue_nonfincorp_fx IQ_BONDS_NOTES if year > 2000
-*gen d_bis = ln(issue_nonfincorp_fx)-ln(issue_nonfincorp_fx[_n-1])
-*gen d_issue = ln(IQ_BONDS_NOTES)-ln(IQ_BONDS_NOTES[_n-1])
-*twoway scatter d_bis d_issue if year > 2001
+
 
 **********************************************************************
 *** 2001 - 08 / 2007 Sample Statistics and Cross-Section Figures ***
@@ -237,7 +233,7 @@ tab year if  tag_IY
 est clear
 
 	*** Big table across terciles of bond debt ***
-estpost tabstat assets_inBN cash_oa profitability tangibility LTG_EPS_mx MB DTI cov_ratio lev_IQ fra_ST lev_mb_IQ  fra_mb_IQ, by(q_lev_mb_IQ) stat (mean q n) col(stat) listwise
+estpost tabstat asets_inBN cash_oa profitability tangibility LTG_EPS_mx MB DTI cov_ratio lev_IQ fra_ST lev_mb_IQ  fra_mb_IQ, by(q_lev_mb_IQ) stat (mean q n) col(stat) listwise
 esttab using ../output/Default_CrossSection_SumStat.tex, ///
 replace cells("mean(fmt(%9.3f)) p25 p50 p75 count(fmt(%9.0fc) label(count))") noobs nomtitle nonumber  label
 
@@ -839,98 +835,6 @@ esttab   b2 b4 b5 b6 b7
 #delimit cr
 
 
-***********************************************************
-*** Table Robustness  -  Sept 17th 2001 -  2001 - 08 / 2007 ***
-***********************************************************
-use ../data/Firm_Return_WS_Bond_Duration_Data_Default_Sample,clear
-keep if date < date("01082007","DMY") & year > 2000
-drop if date == date("09172001","MDY")
-
-est clear
-global firmcontrols "size cash_oa profitability tangibility log_MB DTI cov_ratio"
-gen  dur_proxy = LTG_EPS_mx
-
-
-reghdfe return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_IQ  lev_IQ  ///
-$firmcontrols ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-est store b1
-estadd local DC "\checkmark"
-estadd local FE "\checkmark"
-estadd local ID "\checkmark"
-estadd local CT "\checkmark"
-estadd local IS "\checkmark"
-
-
-reghdfe return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ ///
-c.lev_mb_IQ  $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-est store b2
-estadd local DC "\checkmark"
-estadd local FE "\checkmark"
-estadd local ID "\checkmark"
-estadd local CT "\checkmark"
-estadd local IS "\checkmark"
-
-reghdfe return c.OIS_1M#c.dur_proxy dur_proxy bondtimesshock  mb_issuer_IQ  ///
- $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-est store b3
-estadd local DC "\checkmark"
-estadd local FE "\checkmark"
-estadd local D "\checkmark"
-estadd local CT "\checkmark"
-estadd local IS "\checkmark"
-
-reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.q_lev_mb_IQ ///
-c.q_lev_mb_IQ  $firmcontrols ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-est store b4
-estadd local DC "\checkmark"
-estadd local FE "\checkmark"
-estadd local D "\checkmark"
-estadd local CT "\checkmark"
-estadd local IS "\checkmark"
-
-reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.fra_mb_IQ c.fra_mb_IQ ///
-lev_IQ c.OIS_1M#c.lev_IQ  $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-est store b5
-estadd local DC "\checkmark"
-estadd local FE "\checkmark"
-estadd local D "\checkmark"
-estadd local CT "\checkmark"
-estadd local IS "\checkmark"
-
-reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.q_fra_mb_IQ ///
-c.q_fra_mb_IQ c.OIS_1M#c.lev_IQ c.lev_IQ   $firmcontrols  , ///
-absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-est store b6
-estadd local DC "\checkmark"
-estadd local FE "\checkmark"
-estadd local D "\checkmark"
-estadd local CT "\checkmark"
-estadd local IS "\checkmark"
-
-
-reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ  ///
-c.lev_mb_IQ c.OIS_1M#c.lev_IQ c.lev_IQ  $firmcontrols ///
- ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-est store b7
-estadd local DC "\checkmark"
-estadd local FE "\checkmark"
-estadd local D "\checkmark"
-estadd local CT "\checkmark"
-estadd local IS "\checkmark"
-
-
-reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ ///
-c.lev_mb_IQ c.OIS_1M#i.d_lev_IQ i.d_lev_IQ  $firmcontrols ///
-,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-est store b8
-estadd local DC "\checkmark"
-estadd local FE "\checkmark"
-estadd local D "\checkmark"
-estadd local CT "\checkmark"
-estadd local IS "\checkmark"
-estadd local CLEV "\checkmark"
-
-
 
 
 ***********************************************************
@@ -1260,16 +1164,5 @@ esttab  b1 b2 b6 b3 b4 b5 b7 b8
 		drop(age size log_enterprise_value cash_oa cov_ratio equity_vol profitability tangibility log_MB DTI _cons *.d_lev_IQ#c.OIS_1M *.d_lev_IQ c.OIS_1M#c.dur_proxy dur_proxy lev_mb_IQ operating_profitability)
 		label substitute(\_ _);
 #delimit cr
-
-
-
-
-
-
-
-
-
-
-
 
 
