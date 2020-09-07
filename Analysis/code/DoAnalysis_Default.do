@@ -800,14 +800,41 @@ file close `uhandle'
 ***********************************************************
 *** Table Robustness Shock  2001 - 08 / 2007 ***
 ***********************************************************
+
+est clear
+import delimited "../../Raw_Data/original/dailydataset.csv",clear
+gen statadate = date(date,"YMD")
+format statadate %td
+drop date
+rename statadate date
+tempfile factors
+save `factors'
+
+	***
+
 use ../data/Firm_Return_WS_Bond_Duration_Data_Default_Sample,clear
 keep if date < date("01082007","DMY") & year > 2000
 
-
-est clear
 global firmcontrols "size cash_oa profitability tangibility log_MB DTI cov_ratio"
 gen  dur_proxy = LTG_EPS_mx
 
+merge m:1 date using `factors'
+drop if _merge==2
+
+label var ratefactor1 "Target Factor"
+label var conffactor1 "Timing Factor"
+label var conffactor2 "Forward Guidance Factor"
+
+	/// Interaction All factors
+reghdfe return  c.OIS_1M#c.dur_proxy dur_proxy c.ratefactor1#c.lev_mb_IQ c.conffactor1#c.lev_mb_IQ  c.conffactor2#c.lev_mb_IQ c.lev_mb_IQ  c.surprise_std#c.lev_mb_IQ $firmcontrols ///
+if date < date("01082007","DMY") & year > 2000, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b_altavilla
+estadd local DC "\checkmark"
+estadd local LC "\checkmark"
+estadd local FE "\checkmark"
+estadd local UI "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
 
 	* Baseline Altavilla et al. - OIS 1M
 reghdfe return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ  ///
@@ -818,6 +845,7 @@ estadd local FE "\checkmark"
 estadd local ID "\checkmark"
 estadd local CT "\checkmark"
 estadd local IS "\checkmark"
+
 
 reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.fra_mb_IQ c.fra_mb_IQ ///
 lev_IQ c.OIS_1M#c.lev_IQ  $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
@@ -888,22 +916,22 @@ estadd local IS "\checkmark"
 
 	*MAKE TABLE
 #delimit;
-esttab  b1 b2 b3 b4 b5 b6 b7 b8
-		using ../output/Default_Firm_RobShock.tex, 
+esttab  b5 b7 b1 b3 b_altavilla
+		using "../output/Default_Firm_RobShock.tex", 
 		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  noconstant  nomtitles nogaps
 		obslast booktabs  nonotes 
-		scalar("DC Duration control" "FE Firm FE" "CT Firm controls" "IS Sector $\times$ Date FE")
-		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons lev_mb_IQ fra_mb_IQ lev_IQ c.eureon3m_hf#c.dur_proxy dur_proxy  c.d_ois1mtl#c.dur_proxy dur_proxy c.OIS_3M#c.dur_proxy dur_proxy c.OIS_1M#c.dur_proxy )
+		scalar("DC Duration control" "FE Firm FE" "CT Firm controls" "IS Sector $\times$ Date FE" "UI UI claim controls")
+		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons lev_mb_IQ  c.eureon3m_hf#c.dur_proxy dur_proxy  c.d_ois1mtl#c.dur_proxy dur_proxy c.OIS_3M#c.dur_proxy dur_proxy c.OIS_1M#c.dur_proxy c.surprise_std#c.lev_mb_IQ)
 		label substitute(\_ _);
 #delimit cr
 
 #delimit;
-esttab  b1 b2 b3 b4 b5 b6 b7 b8
-		using ../output/Default_Firm_RobShockPres.tex, 
+esttab   b5 b7 b1 b3 b_altavilla
+		using "../output/Default_Firm_RobShockPres.tex", 
 		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  noconstant  nomtitles nogaps
 		obslast booktabs  nonotes 
-		scalar("DC Duration control" "FE Firm FE" "CT Firm controls" "IS Sector $\times$ Date FE")
-		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons lev_mb_IQ fra_mb_IQ lev_IQ c.eureon3m_hf#c.dur_proxy dur_proxy  c.d_ois1mtl#c.dur_proxy dur_proxy c.OIS_3M#c.dur_proxy dur_proxy c.OIS_1M#c.dur_proxy lev_mb_IQ fra_mb_IQ c.eureon3m_hf#c.lev_IQ c.OIS_3M#c.lev_IQ c.d_ois1mtl#c.lev_IQ  c.OIS_1M#c.lev_IQ)
+		scalar("DC Duration control" "FE Firm FE" "CT Firm controls" "IS Sector $\times$ Date FE" "UI UI claim controls")
+		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons lev_mb_IQ  c.eureon3m_hf#c.dur_proxy dur_proxy  c.d_ois1mtl#c.dur_proxy dur_proxy c.OIS_3M#c.dur_proxy dur_proxy c.OIS_1M#c.dur_proxy lev_mb_IQ  c.surprise_std#c.lev_mb_IQ)
 		label substitute(\_ _);
 #delimit cr
 
