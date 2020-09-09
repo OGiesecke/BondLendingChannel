@@ -5,6 +5,7 @@ graph set window fontface "Times New Roman"
 set linesize 150
 
 * Set directories 
+local 1 "/Users/olivergiesecke/Dropbox/Firm & Monetary Policy/Analysis/code/"
 display `"This is the path: `1'""'
 global path "`1'"
 
@@ -175,6 +176,10 @@ estadd local ID "\checkmark"
 estadd local CT "\checkmark"
 estadd local IS "\checkmark"
 
+matrix coeff=r(table)
+local intcoeff = coeff[1,3]
+
+
 	*Bond issuer dummy works
 reghdfe return c.OIS_1M#c.dur_proxy dur_proxy bondtimesshock  mb_issuer_IQ   $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
 est store b3
@@ -184,13 +189,38 @@ estadd local D "\checkmark"
 estadd local CT "\checkmark"
 estadd local IS "\checkmark"
 
-reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.q_lev_mb_IQ c.q_lev_mb_IQ  $firmcontrols ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-est store b4
-estadd local DC "\checkmark"
-estadd local FE "\checkmark"
-estadd local D "\checkmark"
-estadd local CT "\checkmark"
-estadd local IS "\checkmark"
+drop q_lev_mb_IQ 
+local nq = 3
+foreach var of varlist lev_mb_IQ{
+	di "########################################################################"
+	di "########################## Working on Variable `var' ###################"
+
+	gen q_`var'_help=.
+	levelsof year,local(years)
+	foreach y of local years {	
+		xtile q_help_`y' = `var' if year==`y'  & tag_IY==1, nquantiles(`nq')
+		*tab q_help_`y'
+		replace q_`var'_help=q_help_`y' if year==`y'
+		drop  q_help_`y'
+	}
+	egen q_`var' = mean(q_`var'_help),by(year isin)
+	drop q_`var'_help
+		
+	loc getlabel: var label `var'
+	label define label`var' 2 "2. Tercile `getlabel'" 3  "3. Tercile `getlabel'"
+	label values q_`var' label`var'
+
+	reghdfe return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M c.OIS_1M#ib1.q_`var' ib1.q_`var' ///
+		  $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date) 
+	est store b4
+	estadd local DC "\checkmark"
+	estadd local FE "\checkmark"
+	estadd local D "\checkmark"
+	estadd local CT "\checkmark"
+	estadd local IS "\checkmark"
+}
+
+
 
 reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.fra_mb_IQ c.fra_mb_IQ lev_IQ c.OIS_1M#c.lev_IQ  $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
 est store b5
@@ -200,13 +230,38 @@ estadd local D "\checkmark"
 estadd local CT "\checkmark"
 estadd local IS "\checkmark"
 
-reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.q_fra_mb_IQ c.q_fra_mb_IQ c.OIS_1M#c.lev_IQ c.lev_IQ   $firmcontrols  ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-est store b6
-estadd local DC "\checkmark"
-estadd local FE "\checkmark"
-estadd local D "\checkmark"
-estadd local CT "\checkmark"
-estadd local IS "\checkmark"
+
+drop q_fra_mb_IQ 
+local nq = 3
+foreach var of varlist fra_mb_IQ{
+	di "########################################################################"
+	di "########################## Working on Variable `var' ###################"
+
+	gen q_`var'_help=.
+	levelsof year,local(years)
+	foreach y of local years {		
+		xtile q_help_`y' = `var' if year==`y'  & tag_IY==1, nquantiles(`nq')
+		*tab q_help_`y'
+		replace q_`var'_help=q_help_`y' if year==`y'
+		drop  q_help_`y'
+	}
+	egen q_`var' = mean(q_`var'_help),by(year isin)
+	drop q_`var'_help
+		
+	loc getlabel: var label `var'
+	label define label`var' 2 "2. Tercile `getlabel'" 3  "3. Tercile `getlabel'"
+	label values q_`var' label`var'
+
+	reghdfe return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M c.OIS_1M#ib1.q_`var' ib1.q_`var' ///
+		  $firmcontrols c.lev_IQ c.OIS_1M#c.lev_IQ, absorb(isin_num i.ind_group#i.date) cluster(isin_num date) 
+
+	est store b6
+	estadd local DC "\checkmark"
+	estadd local FE "\checkmark"
+	estadd local D "\checkmark"
+	estadd local CT "\checkmark"
+	estadd local IS "\checkmark"
+}
 
 
 reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ c.OIS_1M#c.lev_IQ c.lev_IQ  $firmcontrols ///
@@ -217,7 +272,6 @@ estadd local FE "\checkmark"
 estadd local D "\checkmark"
 estadd local CT "\checkmark"
 estadd local IS "\checkmark"
-
 
 reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ c.OIS_1M#i.d_lev_IQ i.d_lev_IQ  $firmcontrols ///
 ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
@@ -232,16 +286,17 @@ estadd local CLEV "\checkmark"
 
 	*MAKE TABLE
 #delimit;
-esttab  b2 b3 b4 b5 b6 b7 b8 b1
+esttab   b2 b3 b4 b5 b6 b7 b8 b1
 		using ../output/US_Firm_DebtStructure.tex, 
-		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  
-		noconstant  nomtitles nogaps obslast booktabs  nonotes 
+		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  noconstant  nomtitles nogaps
+		obslast booktabs  nonotes 
 		scalar("DC Duration control" "FE Firm FE" "CT Firm controls" "IS Sector $\times$ Date FE" "CLEV Lev. Quintile Interaction")
-		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons *.d_lev_IQ#c.OIS_1M *.d_lev_IQ c.OIS_1M#c.dur_proxy dur_proxy)
-		order( c.OIS_1M#c.lev_mb_IQ lev_mb_IQ  bondtimesshock  mb_issuer_IQ c.OIS_1M#c.q_lev_mb_IQ q_lev_mb_IQ c.OIS_1M#c.fra_mb_IQ fra_mb_IQ c.OIS_1M#c.q_fra_mb_IQ q_fra_mb_IQ c.OIS_1M#c.lev_IQ lev_IQ)
+		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons *.d_lev_IQ#c.OIS_1M *.d_lev_IQ c.OIS_1M#c.dur_proxy dur_proxy  *.q_lev_mb_IQ *.q_fra_mb_IQ 1.q_lev_mb_IQ#c.OIS_1M 1.q_fra_mb_IQ#c.OIS_1M OIS_1M)
+		order( c.OIS_1M#c.lev_mb_IQ lev_mb_IQ  bondtimesshock  mb_issuer_IQ *.q_lev_mb_IQ#c.OIS_1M c.OIS_1M#c.fra_mb_IQ c.OIS_1M#c.lev_IQ fra_mb_IQ lev_IQ )
 		label substitute(\_ _);
 #delimit cr
 
+/*
 
 	*MAKE PRESENTATION TABLE
 #delimit;
