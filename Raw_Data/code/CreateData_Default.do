@@ -3,9 +3,9 @@ clear all
 set more off , permanently
 
 * Set directories 
-*global path "/Users/olivergiesecke/Dropbox/Firm & Monetary Policy/Int_Data/code"
-display `"this is the path: `1'""'
-global path "`1'"
+global path "/Users/olivergiesecke/Dropbox/Firm & Monetary Policy/Raw_Data/code"
+*display `"this is the path: `1'""'
+*global path "`1'"
 
 display "${path}"
 cd "$path"
@@ -256,6 +256,61 @@ program quarterly_shock
 	keep if tagq==1
 	keep agg_shock_ois_q date_q
 	save ../data/shock_quarterly,replace
+	
+	
+	clear 
+	set obs 100000
+	gen date = 100 +  _n
+	format date %td
+	
+	gen date_q=qofd(date)
+	format date_q %tq
+	bys date_q: gen run = _n
+	keep if run==1
+	gen daysinquarter = date - date[_n-1]
+	keep date_q daysinquarter
+	tempfile daysinquarter
+	save `daysinquarter'
+	
+	clear 
+	set obs 100000
+	gen date = 100 +  _n
+	format date %td
+	
+	gen date_q=qofd(date)
+	format date_q %tq
+	bys date_q: gen dayinquarter = _n
+	keep date dayinquarter
+	tempfile dayinquarter
+	save `dayinquarter'
+	
+	
+	import excel using ../../Raw_Data/original/Dataset_EA-MPD.xlsx, clear sheet("Press Release Window") firstrow
+	gen date_q=qofd(date)
+	keep date OIS_1M date_q
+	format date_q %tq
+	merge m:1 date_q using `daysinquarter'
+	drop if _merge==2
+	drop _merge
+	
+	merge m:1 date using `dayinquarter'
+	drop if _merge==2
+	drop _merge
+	
+	gen wa_shock = (daysinquarter - dayinquarter) / daysinquarter * OIS_1M
+	gen wb_shock = (dayinquarter / daysinquarter) * OIS_1M
+	
+	collapse (sum) wa_shock wb_shock,by(date_q)
+	
+	gen prevwb_shock = wb_shock[_n-1]
+	
+	gen sm_shock = wa_shock + prevwb_shock
+	
+	sum sm_shock,det
+	
+	keep date_q sm_shock
+
+	save ../data/shock_weightedquarterly,replace
 	
 		*** Altavilla et al. shock
 	import excel using ../../Raw_Data/original/Dataset_EA-MPD.xlsx, clear sheet("Press Release Window") firstrow
