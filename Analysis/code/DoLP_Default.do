@@ -4,6 +4,9 @@ set scheme sol, permanently
 graph set window fontface "Times New Roman"
 set linesize 150
 
+* Set directories
+local 1 "/Users/olivergiesecke/Dropbox/Firm & Monetary Policy/Analysis/code/" 
+
 * Set directories 
 display `"This is the path: `1'""'
 global path "`1'"
@@ -33,7 +36,9 @@ gen CF = ebitda + ch_receivables - ch_inventories - ch_payables
 
 sort isin date_q
 drop if assets==.
+duplicates drop isin date_q sales assets,force
 duplicates tag isin date_q,gen(new)
+tab new
 by isin: egen tot_n = total(new)
 drop if tot_n >0
 drop new tot_n 
@@ -123,6 +128,10 @@ keep isin date_q
 sort isin date_q
 format date_q %tq 
 /// 12,223 quarter isin observations
+
+merge m:1 date_q using ../../Raw_Data/data/shock_weightedquarterly
+drop if _merge==2
+drop _merge
 
 merge m:1 date_q using ../../Int_Data/data/shock_quarterly
 drop if _merge==2
@@ -228,7 +237,7 @@ restore
 merge m:1 isin `timeunit' using `FY_withinInd_tercile'
 drop _merge
 
-egen IQ_dummy = group(d2sic date_q)
+egen IQ_dummy = group(d2sic `timeunit')
 *assets sales ppnet profitability tot_liabilities 
 foreach var in assets sales ppnet profitability tot_liabilities  {
 	forvalues i=1/8{
@@ -244,66 +253,165 @@ save ../data/Default_lp_q_balancesheet_terciles,replace
 
 use ../data/Default_lp_q_balancesheet_terciles,clear
 
-
+egen YI_FE = group(year d2sic)
 
 *replace agg_shock_ois_q = agg_shock_JK_q_noinfo * 100
-*keep if year > 2000 & date_q <= quarterly("2006q2","YQ") 
+keep if year > 2000 & date_q <= quarterly("2006q2","YQ") 
 // account for the leads reaching until 2007q4
+
+areg lev_mb_IQ,absorb(IQ_dummy)
+predict lev_mb_IQ_res,res
+
+areg fra_mb_IQ,absorb(isin)
+predict fra_mb_IQ_res,res
+
+areg lev_IQ,absorb(isin)
+predict lev_IQ_res,res
+
+*replace agg_shock_ois_q = sm_shock
+
+
+
+local nq = 3
+foreach var of varlist lev_mb_IQ_res{
+	di "########################################################################"
+	di "########################## Working on Variable `var' ###################"
+
+	gen q_`var'_help=.
+	forvalues y = 2001/2007 {	
+		capture xtile q_help_`y' = `var' if year==`y' , nquantiles(`nq')
+		*tab q_help_`y'
+		capture replace q_`var'_help=q_help_`y' if year==`y'
+		captur edrop  q_help_`y'
+	}
+	egen q_`var' = mean(q_`var'_help),by(year isin)
+	drop  q_`var'_help
+		
+	loc getlabel: var label `var'
+	label define label`var' 2 "2. Tercile `getlabel'" 3  "3. Tercile `getlabel'"
+	label values q_`var' label`var'
+
+}
 
 gen temp = 1
 gen leads=_n-1
 *sales ppnet profitability tot_liabilities
-forvalues tercile = 1/3{
-	* assets  sales  tot_liabilities
-	foreach var in assets ppnet sales  tot_liabilities { 
+forvalues tercile = 1/1{
+	* assets ppnet sales  tot_liabilities
+	foreach var in  ppnet{ 
 	
 	
 	display "################# Process variable `var' ########################"
 	
-	gen coef_`var'_ter`tercile'=.
-	gen se_`var'_ter`tercile'=.
-	gen ciub_`var'_ter`tercile'=.
-	gen cilb_`var'_ter`tercile'=.
-	gen n_`var'_ter`tercile'=.
+	gen coef_`var'=.
+	gen se_`var'=.
+	gen ciub_`var'=.
+	gen cilb_`var'=.
 
-	replace coef_`var'_ter`tercile'=0 if leads==0
-	replace ciub_`var'_ter`tercile'=0 if leads==0
-	replace cilb_`var'_ter`tercile'=0 if leads==0
+
+	replace coef_`var'=0 if leads==0
+	replace ciub_`var'=0 if leads==0
+	replace cilb_`var'=0 if leads==0
 
 	display "################# This is tercile `tercile' ########################"
 	
 	forvalues i=1/8{
 		
+	reg d`i'q_ppnet_res c.agg_shock_ois_q#ibn.q_levmarketIQ_YI ibn.q_levmarketIQ_YI $firmcontrols l1_gdp_growth l2_gdp_growth 	l1_inflation_yoy  l1q_assets l2q_assets if  d_sample
+		
 		*reghdfe d`i'q_`var'_res c.agg_shock_ois_q $firmcontrols l1q_assets l2q_assets l1_gdp_growth l1_inflation_yoy if  q_levmarketIQ_YI == `tercile', absorb(isin) cluster(date_q isin)
 		* q_levmarketIQ_YI q_lev_mb_IQ
-		areg d`i'q_`var'_res c.agg_shock_ois_q $firmcontrols l1_gdp_growth l2_gdp_growth l1_inflation_yoy  l1q_assets l2q_assets  if  q_lev_mb_IQ == `tercile' & d_sample ,absorb(isin) 
+		*reghdfe d`i'q_`var' c.agg_shock_ois_q##c.lev_mb_IQ_res $firmcontrols l1_gdp_growth l2_gdp_growth l1_inflation_yoy  l1q_assets l2q_assets   if  d_sample ,absorb(isin year) 
 		
-		capture replace coef_`var'_ter`tercile'=_b[agg_shock_ois_q] if leads==`i'
-		capture replace se_`var'_ter`tercile'=_se[agg_shock_ois_q]  if leads==`i'
-		replace ciub_`var'_ter`tercile'=coef_`var'_ter`tercile'+1.68*se_`var'_ter`tercile'  if leads==`i'
-		replace cilb_`var'_ter`tercile'=coef_`var'_ter`tercile'-1.68*se_`var'_ter`tercile'  if leads==`i'
+		*
+		*reghdfe d`i'q_`var' c.agg_shock_ois_q##ibn.q_lev_mb_IQ $firmcontrols l1_gdp_growth l2_gdp_growth l1_inflation_yoy  l1q_assets l2q_assets  if d_sample ,absorb(isin YI_FE) 
 		
-		replace n_`var'_ter`tercile'=e(N) if leads == `i'
+		
+		*areg d`i'q_`var'_res c.agg_shock_ois_q $firmcontrols l1_gdp_growth l2_gdp_growth l1_inflation_yoy  l1q_assets l2q_assets  if  q_lev_mb_IQ == `tercile' & d_sample ,absorb(isin) 
+		
+		capture replace coef_`var'=_b[c.agg_shock_ois_q] if leads==`i'
+		capture replace se_`var'=_se[c.agg_shock_ois_q]  if leads==`i'
+		 replace ciub_`var'=coef_`var'+1.68*se_`var'  if leads==`i'
+		 replace cilb_`var'=coef_`var'-1.68*se_`var'  if leads==`i'
+		
+		*capture replace n_`var'_ter`tercile'=e(N) if leads == `i'
+		
 		}
 	}
 }
 
-twoway  (rarea cilb_ppnet_ter1 ciub_ppnet_ter1 leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin)) ///
-(scatter coef_ppnet_ter1  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(blue))  ///
- (rarea cilb_ppnet_ter3 ciub_ppnet_ter3 leads if leads>=0 & leads<=6, sort  color(red%10) lw(vvthin)) ///
- (scatter coef_ppnet_ter3  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(red)), ///
+
+twoway  (rarea cilb_ppnet ciub_ppnet leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin)) ///
+(scatter coef_ppnet  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(blue)), name(agg_response,replace) 
+ 
+ 
+ 
+ 
+ forvalues tercile = 1/1{
+	* assets ppnet sales  tot_liabilities
+	foreach var in  ppnet{ 
+	
+	
+	display "################# Process variable `var' ########################"
+	
+	gen coef_`var'1=.
+	gen se_`var'1=.
+	gen ciub_`var'1=.
+	gen cilb_`var'1=.
+	
+	gen coef_`var'3=.
+	gen se_`var'3=.
+	gen ciub_`var'3=.
+	gen cilb_`var'3=.
+
+
+	replace coef_`var'1=0 if leads==0
+	replace ciub_`var'1=0 if leads==0
+	replace cilb_`var'1=0 if leads==0
+	
+	replace coef_`var'3=0 if leads==0
+	replace ciub_`var'3=0 if leads==0
+	replace cilb_`var'3=0 if leads==0
+
+	display "################# This is tercile `tercile' ########################"
+	
+	forvalues i=1/8{
+			
+		reg d`i'q_ppnet_res c.agg_shock_ois_q#ibn.q_levmarketIQ_YI ///
+		ibn.q_levmarketIQ_YI $firmcontrols l1_gdp_growth l2_gdp_growth 	///
+		l1_inflation_yoy  l1q_assets l2q_assets if  d_sample
+		
+
+		capture replace coef_`var'1=_b[1.q_levmarketIQ_YI#agg_shock_ois_q] if leads==`i'
+		capture replace se_`var'1=_se[1.q_levmarketIQ_YI#agg_shock_ois_q]  if leads==`i'
+		replace ciub_`var'1=coef_`var'1+1.68*se_`var'1  if leads==`i'
+		replace cilb_`var'1=coef_`var'1-1.68*se_`var'1  if leads==`i'
+			
+		capture replace coef_`var'3=_b[3.q_levmarketIQ_YI#agg_shock_ois_q] if leads==`i'
+		capture replace se_`var'3=_se[3.q_levmarketIQ_YI#agg_shock_ois_q]  if leads==`i'
+		replace ciub_`var'3=coef_`var'3+1.68*se_`var'3  if leads==`i'
+		replace cilb_`var'3=coef_`var'3-1.68*se_`var'3  if leads==`i'
+			
+		
+		
+		}
+	}
+}
+ 
+ 
+
+ twoway  (rarea cilb_ppnet1 ciub_ppnet1 leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin)) ///
+(scatter coef_ppnet1  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(blue))  ///
+ (rarea cilb_ppnet3 ciub_ppnet3 leads if leads>=0 & leads<=6, sort  color(red%10) lw(vvthin)) ///
+ (scatter coef_ppnet3  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(red)), ///
 ylabel(-2(0.5)2) yline(0,lp(dash) lc(gs10)) ///
 legend(order( 2 "Low Bond Leverage" 4 "High Bond Leverage" 1 "CI Tercile Low"  3 "CI Tercile High"  )) ///
 xtitle("Horizon (in quaters)",size(large)) ytitle("Change in NetPPE (in %)",size(large)) name(ppnet,replace)
 graph export ../../Analysis/output/Default_LP_PPENetTerciles.pdf,replace
 
-twoway  (rarea cilb_assets_ter1 ciub_assets_ter1 leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin))(scatter coef_assets_ter1  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(blue))   (rarea cilb_assets_ter3 ciub_assets_ter3 leads if leads>=0 & leads<=6, sort  color(red%10) lw(vvthin))(scatter coef_assets_ter3  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(red)) ,ylabel(-1(0.5)1) yline(0,lp(dash) lc(gs10)) legend(order( 2 "Low Market Leverage" 4 "High Market Leverage" 1 "CI Tercile Low"  3 "CI Tercile High"  )) xtitle("Horizon (in quaters)",size(large)) ytitle("Change in Assets (in %)",size(large)) name(assets,replace)
-graph export ../../Analysis/output/Default_LP_AssetsTerciles.pdf,replace
-
-twoway  (rarea cilb_tot_liabilities_ter1 ciub_tot_liabilities_ter1 leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin))(scatter coef_tot_liabilities_ter1  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(blue))   (rarea cilb_tot_liabilities_ter3 ciub_tot_liabilities_ter3 leads if leads>=0 & leads<=6, sort  color(red%10) lw(vvthin))(scatter coef_tot_liabilities_ter3  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(red)) ,ylabel(-1(0.5)1) yline(0,lp(dash) lc(gs10)) legend(order( 2 "Low Bond Leverage" 4 "High Bond Leverage" 1 "CI Tercile Low"  3 "CI Tercile High"  )) xtitle("Horizon (in quaters)",size(large)) ytitle("Change in Total Liabilities (in %)",size(large)) name(liab,replace)
-graph export ../../Analysis/output/Default_LP_LiabilityTerciles.pdf,replace
-
-
+ 
+ 
+ 
 
 ********************************************************************************
 
@@ -402,4 +510,3 @@ twoway  (rarea ciub_rate_diff_AA_5Y cilb_rate_diff_AA_5Y leads if leads>=0 & lea
 yline(0,lp(dash) lc(gs10)) title("Diff. Bank Rate - AA Bonds 5Y ") legend(off) xlabel(0(3)12) ///
 legend(off) xtitle("Horizon (in month)",size(large))  name(DiffAA5YSpread,replace)
 graph export ../../Analysis/output/Default_LP_BankAA5Y.pdf, replace
-
