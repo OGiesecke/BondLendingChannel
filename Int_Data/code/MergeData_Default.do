@@ -3,7 +3,7 @@ clear all
 set more off , permanently
 
 * Set directories 
-*global path "/Users/olivergiesecke/Dropbox/NewMP/Int_Data/code"
+local 1 "/Users/olivergiesecke/Dropbox/Firm & Monetary Policy/Int_Data/code"
 display `"this is the path: `1'"'
 global path "`1'"
 

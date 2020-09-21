@@ -10,7 +10,7 @@ set more off , permanently
 
 
 * Set directories 
-*global path "/Users/olivergiesecke/Dropbox/NewMP/Int_Data/code"
+local 1 "/Users/olivergiesecke/Dropbox/Firm & Monetary Policy/Int_Data/code"
 display `"this is the path: `1'""'
 global path "`1'"
 
@@ -50,7 +50,8 @@ bys isin: asreg ex_return ex_market , window(date 365)
 
 gen abn_return = ex_return -  _b_ex_market * ex_market
 
-keep date isin abn_return
+keep date isin abn_return _b_ex_market
+rename _b_ex_market CAPMbeta
 
 save  ../data/Default_abn_return,replace
 
