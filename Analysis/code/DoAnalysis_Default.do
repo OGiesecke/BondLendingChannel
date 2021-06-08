@@ -1441,11 +1441,11 @@ drop tag_isin
 egen tag_isin=tag(isin)
 tab tag_isin
 
-drop q_dtd
+drop q_dtd q_defprob
 
 
 local nq = 3
-foreach var of varlist   equity_vol dtd {
+foreach var of varlist   equity_vol dtd defprob {
 	gen q_`var'_help=.
 	forvalues y = 2001/2007 {	
 		xtile q_help_`y' = `var' if year==`y'  & tag_IY==1, nquantiles(`nq')
@@ -1478,10 +1478,11 @@ estadd local IS "\checkmark"
 
 	***
 	
-label define dtdlabel 2 "2. Tercile Dist.-to-default" 3 "3. Tercile Dist.-to-default"
-label values  q_dtd dtdlabel
+label define defproblabel 2 "2. Tercile Default Probability" 3 "3. Tercile Default Probability"
+label values  q_defprob defproblabel
 	
-local var "dtd"
+*local var "dtd"
+local var "defprob"
 reghdfe return c.OIS_1M#c.dur_proxy dur_proxy ib1.q_`var'##c.lev_mb_IQ##c.OIS_1M  ///
 		  $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
 
@@ -1499,6 +1500,6 @@ esttab  b2 b1
 		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  noconstant  nomtitles nogaps
 		obslast booktabs  nonotes 
 		scalar("DC Duration control" "FE Firm FE" "CT Firm controls" "IS Sector $\times$ Date FE")
-		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons lev_mb_IQ  c.OIS_1M#c.dur_proxy dur_proxy *.q_equity_vol#c.OIS_1M OIS_1M *.q_equity_vol#c.lev_mb_IQ *.q_equity_vol 1.q_equity_vol#c.lev_mb_IQ#c.OIS_1M *.q_dtd#c.OIS_1M OIS_1M *.q_dtd#c.lev_mb_IQ *.q_dtd 1.q_dtd#c.lev_mb_IQ#c.OIS_1M)
+		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons lev_mb_IQ  c.OIS_1M#c.dur_proxy dur_proxy *.q_equity_vol#c.OIS_1M OIS_1M *.q_equity_vol#c.lev_mb_IQ *.q_equity_vol 1.q_equity_vol#c.lev_mb_IQ#c.OIS_1M *.q_defprob#c.OIS_1M OIS_1M *.q_defprob#c.lev_mb_IQ *.q_defprob 1.q_defprob#c.lev_mb_IQ#c.OIS_1M)
 		label substitute(\_ _);
 #delimit cr
