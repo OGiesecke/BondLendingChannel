@@ -515,7 +515,6 @@ save `factors'
 	***
 
 use ../data/Firm_Return_WS_Bond_Duration_Data_Default_Sample,clear
-keep if date < date("01082007","DMY") & year > 2000
 
 global firmcontrols "size cash_oa profitability tangibility log_MB DTI cov_ratio"
 gen  dur_proxy = LTG_EPS_mx
@@ -526,6 +525,45 @@ drop if _merge==2
 label var ratefactor1 "Target Factor"
 label var conffactor1 "Timing Factor"
 label var conffactor2 "Forward Guidance Factor"
+label var conffactor3 "QE Factor"
+rename conffactor3 QEfactor
+
+***********************************************************
+drop tag_date
+egen tag_date = tag(date)
+tab tag_date if year < 2019 & year > 2012
+
+
+reghdfe return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ  ///
+ $firmcontrols if date < date("01082007","DMY") & year > 2000 , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+
+gen fullsample = date < date("01082007","DMY") & year > 2000
+replace  fullsample  = 1 if year < 2019 & year > 2012
+tab tag_date if   fullsample
+
+reghdfe return c.OIS_1M#c.dur_proxy dur_proxy  c.OIS_1M#c.lev_mb_IQ  lev_mb_IQ  ///
+$firmcontrols if fullsample ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+
+* twoway scatter conffactor3 date if tag_date == 1 & year < 2019 & year > 2012,c(l)
+* QE Specification 
+reghdfe return c.QEfactor#c.dur_proxy dur_proxy c.QEfactor#c.lev_mb_IQ c.lev_mb_IQ surprise_std  ///
+$firmcontrols  if year < 2019 & year > 2012, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+
+ * Altavilla preferred specification 
+reghdfe return c.QEfactor#c.dur_proxy dur_proxy c.QEfactor#c.lev_mb_IQ c.lev_mb_IQ  ///
+$firmcontrols  if year < 2019 & year > 2013, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+
+reghdfe return c.QEfactor#c.dur_proxy dur_proxy c.QEfactor#c.lev_mb_IQ c.surprise_std#c.lev_mb_IQ c.lev_mb_IQ surprise_std  ///
+$firmcontrols  if year < 2019 & year > 2013, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+
+ 
+
+
+***********************************************************
+
+
+keep if date < date("01082007","DMY") & year > 2000
+
 
 	/// Interaction All factors
 reghdfe return  c.OIS_1M#c.dur_proxy dur_proxy c.ratefactor1#c.lev_mb_IQ c.conffactor1#c.lev_mb_IQ  c.conffactor2#c.lev_mb_IQ c.lev_mb_IQ  c.surprise_std#c.lev_mb_IQ $firmcontrols ///
@@ -1015,7 +1053,7 @@ esttab   b2 b4 b5 b6 b7
 
 
 ***********************************************************
-*** TablePost Crisis Sample Output 2001 - 08 / 2007 ***
+*** TablePost Crisis Sample Output 2012-2918 ***
 ***********************************************************
 use ../data/Firm_Return_WS_Bond_Duration_Data_Default_Sample,clear
 keep if year > 2012 & year<2019
