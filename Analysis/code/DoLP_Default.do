@@ -53,7 +53,7 @@ keep isin
 duplicates drop isin,force
 gen date_q = qofd(date("01012000","DMY"))
 format date_q %tq
-gen dup = 80
+gen dup = 240
 expand dup
 sort isin
 by isin: gen n =_n-1
@@ -183,8 +183,9 @@ merge m:1 year isin using `mlev'
 drop _merge
 sort isin date_q
 
-keep if  date_q <= quarterly("2006q3","YQ") 
-
+*keep if  date_q <= quarterly("2006q3","YQ") 
+keep if  date_q <= quarterly("2006q3","YQ") | date_q >= quarterly("2013q1","YQ")
+tab date_q
 gen d2sic=int(sic/100)
 
 
