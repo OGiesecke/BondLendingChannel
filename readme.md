@@ -1,7 +1,7 @@
 # Replication File for "The Bond Lending Channel of Monetary Policy"
 Olivier Darmouni, Oliver Giesecke, Alexander Rodnyansky
 
-April 16, 2020
+September 06, 2021
 
 Contact: o.giesecke@columbia.edu
 
@@ -9,10 +9,10 @@ Contact: o.giesecke@columbia.edu
 
 Data has been obtained from a variety of public and proprietary databases. The following enumeration lists the source for each:
 
-- Index constituents for  EURO STOXX sectoral indices and S&P500 index: Datastream terminal
+- Index constituents for  EURO STOXX sectoral indices and S&P500 index: Datastream
 - Capital structure: Capital IQ Excel Plug-in, manual collection from https://www.mergentarchives.com, Capital IQ terminal and publicly available annual reports.
-- Daily stock prices: Datastream terminal
-- Market capitalization: Datastream terminal
+- Daily stock prices: Datastream and Compustat Global Security File
+- Market capitalization: Datastream
 - ECB HPI: ECB Statistical Data Warehouse (SDW), series as indicated.
 - US CPI: https://fred.stlouisfed.org, mnemonic: CPIAUCSL_NBD20150101
 - BIS total debt securities outstanding: Debt securities statistics (DEBT_SEC2), http://stats.bis.org:8089/statx/srs/table/c1?f=csv
@@ -20,7 +20,7 @@ Data has been obtained from a variety of public and proprietary databases. The f
 - Jarocinski, Karadi shock series: Jarociński, Marek, and Peter Karadi. 2020. "Deconstructing Monetary Policy Surprises—The Role of Information Shocks." American Economic Journal: Macroeconomics, 12 (2): 1-43.
 - Altavilla shock series: Altavilla, Carlo, Luca Brugnolini, Refet S. Gürkaynak, Roberto Motto, and Giuseppe Ragusa. "Measuring euro area monetary policy." Journal of Monetary Economics 108 (2019): 162-179.
 - Nakamura and Steinsson shock series: Nakamura, Emi, and Jón Steinsson. "High-frequency identification of monetary non-neutrality: the information effect." The Quarterly Journal of Economics 133, no. 3 (2018): 1283-1330.
-- Balance sheet information: Worldscope (annual) and Worldscope (quarterly) from WRDS
+- Balance sheet information: Worldscope (annual) and Worldscope (quarterly) from WRDS, Compustat Global (annual and quarterly)
 - Credit ratings: Bloomberg terminal
 - Analyst forecasts: Thomson Reuters IBES
 - OIS swaps: Bloomberg terminal
@@ -83,6 +83,7 @@ The file *Run_Analysis.py* runs the analysis and creates all tables and figures 
 - DoAnalysis_Default.do
 - Do_MacroTimeSeries.do
 - Do_lp_bloombergbond.do
+- DoAnalysis_Broadsample
 ```
 
 ## Final Sample

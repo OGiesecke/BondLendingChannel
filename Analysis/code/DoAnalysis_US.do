@@ -154,11 +154,15 @@ gen  dur_proxy = LTG_EPS_mx
 gen OIS_1M = d_shock_je
 label var OIS_1M "$\Delta$ FFR"
 
+
+* Avg Response
+reghdfe return c.OIS_1M#c.dur_proxy dur_proxy  c.OIS_1M  $firmcontrols ,absorb(isin_num) cluster(isin_num date)
+
 	* Replication of Ippolito et al.
 reghdfe return c.OIS_1M#c.lev_bank_IQ c.lev_bank_IQ  $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
 
 reghdfe return c.OIS_1M#c.fra_bank_IQ c.fra_bank_IQ c.OIS_1M#c.lev_IQ c.lev_IQ $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-	*
+
 	
 reghdfe return c.OIS_1M#c.dur_proxy dur_proxy  c.OIS_1M#c.lev_IQ  lev_IQ  $firmcontrols ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
 est store b1

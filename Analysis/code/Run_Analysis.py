@@ -12,7 +12,7 @@ def run_stata(dofile,directory):
     cmd = ["stata-se", '-b', "do", dofile, f"\"{directory}\"", "&"]
     subprocess.run(cmd)
 
-## Set the working directory 
+## Set the working directory
 directory=str(pathlib.Path().absolute())
 print(f"The script is executed on path: {directory}")
 push = 1
@@ -33,7 +33,7 @@ if push ==1:
     try:
         os.system('rm  ../data/*')
     except:
-        print('No pre-existing data available')   
+        print('No pre-existing data available')
     print("Data and outputs cleared")
     os.system('cp ../../Int_Data/data/Firm_Return_WS_Bond_Duration_Data_Default_Sample.dta ../data')
     print('Default sample data pushed')
@@ -57,7 +57,7 @@ print('US Analysis is done')
 
 dofile = 'Rating_Downgrades.do'
 run_stata(dofile,directory)
-print('Rating downgrades is done') 
+print('Rating downgrades is done')
 
 dofile = 'DoLP_Default.do'
 run_stata(dofile,directory)
@@ -71,10 +71,13 @@ dofile = 'Do_MacroTimeSeries.do'
 run_stata(dofile,directory)
 print('Macro time series is done')
 
+dofile = 'DoAnalysis_Broadsample.do'
+run_stata(dofile,directory)
+print('Broad sample is done')
+
+
 ## Move the log files
 try:
     os.system('mv *.log ../log_file/')
 except:
     print('No log file')
-
-

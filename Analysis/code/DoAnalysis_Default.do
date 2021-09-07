@@ -337,6 +337,10 @@ est clear
 global firmcontrols "size cash_oa profitability tangibility log_MB DTI cov_ratio"
 gen  dur_proxy = LTG_EPS_mx
 
+* Avg Response
+reghdfe return c.OIS_1M#c.dur_proxy dur_proxy  c.OIS_1M  $firmcontrols ,absorb(isin_num) cluster(isin_num date)
+
+
 reghdfe return c.OIS_1M#c.dur_proxy dur_proxy  c.OIS_1M#c.lev_IQ  lev_IQ  $firmcontrols ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
 est store b1
 estadd local DC "\checkmark"
@@ -515,6 +519,7 @@ save `factors'
 	***
 
 use ../data/Firm_Return_WS_Bond_Duration_Data_Default_Sample,clear
+keep if date < date("01082007","DMY") & year > 2000
 
 global firmcontrols "size cash_oa profitability tangibility log_MB DTI cov_ratio"
 gen  dur_proxy = LTG_EPS_mx
@@ -525,45 +530,6 @@ drop if _merge==2
 label var ratefactor1 "Target Factor"
 label var conffactor1 "Timing Factor"
 label var conffactor2 "Forward Guidance Factor"
-label var conffactor3 "QE Factor"
-rename conffactor3 QEfactor
-
-***********************************************************
-drop tag_date
-egen tag_date = tag(date)
-tab tag_date if year < 2019 & year > 2012
-
-
-reghdfe return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ  ///
- $firmcontrols if date < date("01082007","DMY") & year > 2000 , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-
-gen fullsample = date < date("01082007","DMY") & year > 2000
-replace  fullsample  = 1 if year < 2019 & year > 2012
-tab tag_date if   fullsample
-
-reghdfe return c.OIS_1M#c.dur_proxy dur_proxy  c.OIS_1M#c.lev_mb_IQ  lev_mb_IQ  ///
-$firmcontrols if fullsample ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-
-* twoway scatter conffactor3 date if tag_date == 1 & year < 2019 & year > 2012,c(l)
-* QE Specification 
-reghdfe return c.QEfactor#c.dur_proxy dur_proxy c.QEfactor#c.lev_mb_IQ c.lev_mb_IQ surprise_std  ///
-$firmcontrols  if year < 2019 & year > 2012, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-
- * Altavilla preferred specification 
-reghdfe return c.QEfactor#c.dur_proxy dur_proxy c.QEfactor#c.lev_mb_IQ c.lev_mb_IQ  ///
-$firmcontrols  if year < 2019 & year > 2013, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-
-reghdfe return c.QEfactor#c.dur_proxy dur_proxy c.QEfactor#c.lev_mb_IQ c.surprise_std#c.lev_mb_IQ c.lev_mb_IQ surprise_std  ///
-$firmcontrols  if year < 2019 & year > 2013, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
-
- 
-
-
-***********************************************************
-
-
-keep if date < date("01082007","DMY") & year > 2000
-
 
 	/// Interaction All factors
 reghdfe return  c.OIS_1M#c.dur_proxy dur_proxy c.ratefactor1#c.lev_mb_IQ c.conffactor1#c.lev_mb_IQ  c.conffactor2#c.lev_mb_IQ c.lev_mb_IQ  c.surprise_std#c.lev_mb_IQ $firmcontrols ///
@@ -1050,10 +1016,272 @@ esttab   b2 b4 b5 b6 b7
 #delimit cr
 */
 
+***********************************************************
+*** Robustness: Table Debt structure - Full Sample
+***********************************************************
+use ../data/Firm_Return_WS_Bond_Duration_Data_Default_Sample,clear
+
+
+est clear
+global firmcontrols "size cash_oa profitability tangibility log_MB DTI cov_ratio"
+gen  dur_proxy = LTG_EPS_mx
+
+drop q_lev_mb_IQ 
+local nq = 3
+foreach var of varlist lev_mb_IQ{
+	di "########################################################################"
+	di "########################## Working on Variable `var' ###################"
+
+	gen q_`var'_help=.
+	forvalues y = 2001/2018 {	
+		xtile q_help_`y' = `var' if year==`y'  & tag_IY==1, nquantiles(`nq')
+		*tab q_help_`y'
+		replace q_`var'_help=q_help_`y' if year==`y'
+		drop  q_help_`y'
+	}
+	egen q_`var' = mean(q_`var'_help),by(year isin)
+	drop q_`var'_help
+		
+	loc getlabel: var label `var'
+	label define label`var' 2 "2. Tercile `getlabel'" 3  "3. Tercile `getlabel'"
+	label values q_`var' label`var'
+
+}
+
+drop q_fra_mb_IQ 
+local nq = 3
+foreach var of varlist fra_mb_IQ{
+	di "########################################################################"
+	di "########################## Working on Variable `var' ###################"
+
+	gen q_`var'_help=.
+	forvalues y = 2001/2018 {	
+		xtile q_help_`y' = `var' if year==`y'  & tag_IY==1, nquantiles(`nq')
+		*tab q_help_`y'
+		replace q_`var'_help=q_help_`y' if year==`y'
+		drop  q_help_`y'
+	}
+	egen q_`var' = mean(q_`var'_help),by(year isin)
+	drop q_`var'_help
+		
+	loc getlabel: var label `var'
+	label define label`var' 2 "2. Tercile `getlabel'" 3  "3. Tercile `getlabel'"
+	label values q_`var' label`var'
+
+
+}
+
+gen fullsample = date < date("01082007","DMY") & year > 2000
+replace  fullsample  = 1 if year < 2019 & year > 2012
+tab tag_date if fullsample
+keep if fullsample
+
+drop tag_isin
+egen tag_isin = tag(isin)
+tab tag_isin if fullsample
+
+
+egen tag_d = tag(date)
+tab tag_d if fullsample
+
+reghdfe return c.OIS_1M#c.dur_proxy dur_proxy  c.OIS_1M#c.lev_IQ  lev_IQ  $firmcontrols ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b1
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local ID "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+
+reghdfe return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ  $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b2
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local ID "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+
+matrix coeff=r(table)
+local intcoeff = coeff[1,3]
+
+
+	*Bond issuer dummy works
+reghdfe return c.OIS_1M#c.dur_proxy dur_proxy bondtimesshock  mb_issuer_IQ   $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b3
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local D "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+
+
+reghdfe return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M c.OIS_1M#ib1.q_lev_mb_IQ ib1.q_lev_mb_IQ ///
+	  $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date) 
+est store b4
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local D "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+
+
+reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.fra_mb_IQ c.fra_mb_IQ lev_IQ c.OIS_1M#c.lev_IQ  $firmcontrols , absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b5
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local D "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+
+
+
+reghdfe return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M c.OIS_1M#ib1.q_fra_mb_IQ ib1.q_fra_mb_IQ ///
+	  $firmcontrols c.lev_IQ c.OIS_1M#c.lev_IQ, absorb(isin_num i.ind_group#i.date) cluster(isin_num date) 
+
+est store b6
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local D "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+
+reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ c.OIS_1M#c.lev_IQ c.lev_IQ  $firmcontrols ///
+ ,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b7
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local D "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+
+reghdfe  return c.OIS_1M#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ c.OIS_1M#i.d_lev_IQ i.d_lev_IQ  $firmcontrols ///
+,absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b8
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local D "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+estadd local CLEV "\checkmark"
+
+
+	*MAKE TABLE
+#delimit;
+esttab   b2 b3 b4 b5 b6 b7 b8 b1
+		using ../output/Default_Firm_DebtStructureFullSample.tex, 
+		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  noconstant  nomtitles nogaps
+		obslast booktabs  nonotes 
+		scalar("DC Duration control" "FE Firm FE" "CT Firm controls" "IS Sector $\times$ Date FE" "CLEV Lev. Quintile Interaction")
+		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons *.d_lev_IQ#c.OIS_1M *.d_lev_IQ c.OIS_1M#c.dur_proxy dur_proxy  *.q_lev_mb_IQ *.q_fra_mb_IQ 1.q_lev_mb_IQ#c.OIS_1M 1.q_fra_mb_IQ#c.OIS_1M OIS_1M)
+		order( c.OIS_1M#c.lev_mb_IQ lev_mb_IQ  bondtimesshock  mb_issuer_IQ *.q_lev_mb_IQ#c.OIS_1M c.OIS_1M#c.fra_mb_IQ c.OIS_1M#c.lev_IQ fra_mb_IQ lev_IQ )
+		label substitute(\_ _);
+#delimit cr
+
 
 
 ***********************************************************
-*** TablePost Crisis Sample Output 2012-2918 ***
+*** Table Robustness: QE Response
+***********************************************************
+
+est clear
+import excel "~/Downloads/bund5y_press.xlsx",clear firstrow
+tempfile bund5y
+save `bund5y'
+
+est clear
+import delimited "../../Raw_Data/original/dailydataset.csv",clear
+gen statadate = date(date,"YMD")
+format statadate %td
+drop date
+rename statadate date
+* twoway scatter ois_de_con_5y conffactor3
+tempfile factors
+save `factors'
+
+	***
+
+use "../data/Firm_Return_WS_Bond_Duration_Data_Default_Sample",clear
+
+global firmcontrols "size cash_oa profitability tangibility log_MB DTI cov_ratio"
+gen  dur_proxy = LTG_EPS_mx
+
+merge m:1 date using `factors'
+drop if _merge==2
+drop _merge
+merge m:1 date using `bund5y'
+drop if _merge==2
+drop _merge
+
+label var ratefactor1 "Target Factor"
+label var conffactor1 "Timing Factor"
+label var conffactor2 "Forward Guidance Factor"
+label var conffactor3 "QE Factor"
+label var surprise_std "UI Shock"
+rename conffactor3 QEfactor
+
+* QE Specification 
+
+drop tag_date
+egen tag_date = tag(date)
+tab tag_date if year < 2019 & year > 2012
+label var ois_de_con_5y "OIS 5Y"
+
+
+ * Altavilla preferred specification 
+reghdfe return c.QEfactor#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.QEfactor#c.lev_mb_IQ c.lev_mb_IQ  ///
+$firmcontrols  if year < 2019 & year > 2013, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b1
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local D "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+estadd local CLEV "\checkmark"
+
+reghdfe return c.ois_de_con_5y#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.ois_de_con_5y#c.lev_mb_IQ c.lev_mb_IQ  ///
+$firmcontrols  if year < 2019 & year > 2013, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b2
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local D "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+estadd local CLEV "\checkmark"
+
+reghdfe return c.DE5Y#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.DE5Y#c.lev_mb_IQ c.lev_mb_IQ  ///
+$firmcontrols  if year < 2019 & year > 2013, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b3
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local D "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+estadd local CLEV "\checkmark"
+
+reghdfe return c.QEfactor#c.dur_proxy dur_proxy c.OIS_1M#c.lev_mb_IQ c.QEfactor#c.lev_mb_IQ c.surprise_std#c.lev_mb_IQ c.lev_mb_IQ surprise_std  ///
+$firmcontrols  if year < 2019 & year > 2013, absorb(isin_num i.ind_group#i.date) cluster(isin_num date)
+est store b4
+estadd local DC "\checkmark"
+estadd local FE "\checkmark"
+estadd local D "\checkmark"
+estadd local CT "\checkmark"
+estadd local IS "\checkmark"
+estadd local CLEV "\checkmark"
+ 
+ 	*MAKE TABLE
+#delimit;
+esttab  b1 b2 b3 b4
+		using "../output/Default_Firm_QE.tex", 
+		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  noconstant  nomtitles nogaps
+		obslast booktabs  nonotes 
+		scalar("DC Duration control" "FE Firm FE" "CT Firm controls" "IS Sector $\times$ Date FE")
+		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons lev_mb_IQ c.QEfactor#c.dur_proxy dur_proxy	  c.DE5Y#c.dur_proxy  c.ois_de_con_5y#c.dur_proxy surprise_std)
+		label substitute(\_ _);
+#delimit cr
+
+
+
+***********************************************************
+*** TablePost Crisis Sample Output 2001 - 08 / 2007 ***
 ***********************************************************
 use ../data/Firm_Return_WS_Bond_Duration_Data_Default_Sample,clear
 keep if year > 2012 & year<2019

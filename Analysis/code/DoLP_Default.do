@@ -23,16 +23,18 @@ use ../../Int_Data/data/ws_bs_quarterly,clear
 // Define outcome variables analogously to before
 gen lev=tdebt/assets //total debt leverage
 gen long_lev=ldebt/assets // long term debt leverage
-gen mnet_lev=(tdebt-cash)/assets // manual net debt leverage
+gen mnet_lev= (tdebt-cash)/assets // manual net debt leverage
 gen capexoverppnet=capex/ppnet
-gen capexoverassets=capex/assets
+gen capexoverassets=capex / assets[_n-1]
+gen noncashassets = (assets - cash)/assets[_n-1]
 gen lev_ST=sandcdebt/assets
 gen fra_ST=sandcdebt/tdebt
-gen cov_ratio=ebitda/intexp
-gen profitability=ebitda/assets
+gen cov_ratio = ebitda/intexp
+gen profitability = ebitda/assets
 gen DTI = tdebt/ebitda
 gen NDTI = (tdebt-cash)/ebitda
 gen CF = ebitda + ch_receivables - ch_inventories - ch_payables
+gen networth = assets - tot_liabilities
 
 sort isin date_q
 drop if assets==.
@@ -53,7 +55,7 @@ keep isin
 duplicates drop isin,force
 gen date_q = qofd(date("01012000","DMY"))
 format date_q %tq
-gen dup = 240
+gen dup = 81
 expand dup
 sort isin
 by isin: gen n =_n-1
@@ -68,12 +70,28 @@ drop date
 
 * Note that the shocks are defined backwards t-(t-1)
 * Hence the changes in the balance sheet variables have to be defined forwards.
-global bsitems "sales  cash assets ldebt tdebt tot_liabilities ppnet profitability "
+global bsitems "sales  cash assets ldebt tdebt tot_liabilities ppnet profitability networth"
 foreach var of varlist $bsitems{
 	forvalues i=1/8{
-		bys isin: gen d`i'q_`var'=(ln(`var'[_n+`i'])-ln(`var'[_n]))*100
+		bys isin: gen d`i'q_`var'=(ln(`var'[_n+`i'-1])-ln(`var'[_n-1]))*100
 	}
 }
+
+foreach var of varlist $bsitems{
+	forvalues i=1/8{
+		bys isin: gen d`i'q_alt`var'= (`var'[_n + `i' - 1] - `var'[_n-1] ) / assets[_n-1] * 100
+	}
+}
+
+forvalues i=1/8{
+	bys isin: gen d`i'q_netassets = ( (assets[_n+`i'-1] -  cash[_n+`i'-1]) - ///
+	(assets[_n - 1] -  cash[_n - 1]))   / assets[_n-1] * 100
+}
+
+forvalues i=1/8{
+	bys isin: gen d`i'q_capoverassets = capex[_n+`i'] / assets[_n-1] * 100
+}
+
 
 	* Lagged growth
 foreach var of varlist $bsitems{
@@ -85,7 +103,7 @@ foreach var of varlist $bsitems{
 
 * Create three lags of the dependent variable
 sort isin date_q
-foreach var in sales  cash assets ldebt tdebt tot_liabilities ppnet{
+foreach var in sales cash assets ldebt tdebt tot_liabilities ppnet{
 bys isin: gen L1`var'=`var'[_n-1]
 bys isin: gen L2`var'=`var'[_n-2]
 bys isin: gen L3`var'=`var'[_n-3]
@@ -164,6 +182,21 @@ save ../../Int_Data/data/Default_lp_q_balancesheet,replace
 
 ********************************************************************************
 
+import delimited "../../Raw_Data/original/dailydataset.csv",clear
+gen statadate = date(date,"YMD")
+format statadate %td
+gen date_q = qofd(statadate)
+format date_q %tq
+
+collapse (sum) ratefactor1 conffactor1 conffactor2 conffactor3,by(date_q)
+
+label var ratefactor1 "Target Factor"
+label var conffactor1 "Timing Factor"
+label var conffactor2 "Forward Guidance Factor"
+
+tempfile factors
+save `factors'
+
 	***
 use ../../Analysis/data/Firm_Return_WS_Bond_Duration_Data_Default_Sample,clear
 drop tag_IY
@@ -171,10 +204,9 @@ egen tag_IY=tag(isin year)
 keep if tag_IY
 
 global firmcontrols "size cash_oa profitability tangibility log_MB DTI cov_ratio"
-keep isin year lev_mb_IQ q_lev_mb_IQ lev_IQ fra_mb_IQ $firmcontrols sic 
+keep isin year lev_mb_IQ q_lev_mb_IQ lev_IQ fra_mb_IQ dtd $firmcontrols sic 
 tempfile mlev
 save `mlev'
-
 
 use ../../Int_Data/data/Default_lp_q_balancesheet,clear
 gen year = year(dofq(date_q))
@@ -183,10 +215,152 @@ merge m:1 year isin using `mlev'
 drop _merge
 sort isin date_q
 
+merge m:1 date_q using `factors'
+drop _merge
 *keep if  date_q <= quarterly("2006q3","YQ") 
-keep if  date_q <= quarterly("2006q3","YQ") | date_q >= quarterly("2013q1","YQ")
+sort isin date_q
+
 tab date_q
-gen d2sic=int(sic/100)
+gen d2sic= int(sic/100)
+egen YI_FE = group(date_q d2sic)
+
+foreach var of varlist lev_mb_IQ dtd lev_IQ fra_mb_IQ{
+	by isin: egen `var'_std = std(`var')
+}
+
+*winsor2 d1q_altppnet,cut(1 99)
+
+
+	*** Investment ***
+label var sm_shock "MP Shock"
+label var lev_mb_IQ_std "Bond over Assets"
+label var lev_IQ_std "Debt over Assets"
+	
+forvalues h = 1/6{
+	di "Horizon: `h'"
+	reghdfe d`h'q_altppnet c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ_std  ///
+	$firmcontrols  if date_q <= quarterly("2006q1","YQ")  | (year >= 2013 & date_q <= quarterly("2017q1","YQ")) ///
+	& d_sample , absorb(YI_FE isin) cluster(date_q isin)
+	est store inv`h'
+	estadd local FE "Ind2d $\times$ Date"
+	estadd local CT "\checkmark"
+	estadd local CL "Ind2d $\times$ Date"
+}
+
+	*MAKE TABLE
+#delimit;
+esttab  inv1 inv2 inv3 inv4 inv5 inv6
+		using "../../Extra_Analysis/Default_Firm_Investment.tex", 
+		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  
+		noconstant   nogaps obslast booktabs  nonotes 
+		scalar("FE Fixed Effects" "CT Firm controls" "CL Cluster-SE") 
+		mtitles("t+1" "t+2" "t+3" "t+4" "t+5" "t+6")
+		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio sm_shock _cons)
+		order(c.sm_shock#c.lev_mb_IQ_std lev_mb_IQ_std c.sm_shock#c.lev_IQ_std  lev_IQ_std )
+		label substitute(\_ _);
+#delimit cr
+
+
+/*
+
+reghdfe d1q_ppnet c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ $firmcontrols  L1assets L2assets  ///
+if date_q <= quarterly("2006q3","YQ") | (year >= 2013 & date_q <= quarterly("2017q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+reghdfe d2q_ppnet c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2006q3","YQ") | (year >= 2013 & date_q <= quarterly("2017q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+reghdfe d3q_ppnet c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2006q3","YQ") | (year >= 2013 & date_q <= quarterly("2017q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+reghdfe d4q_ppnet c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2006q3","YQ") | (year >= 2013 & date_q <= quarterly("2017q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+reghdfe d5q_ppnet c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2006q3","YQ") | (year >= 2013 & date_q <= quarterly("2017q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+reghdfe d6q_ppnet c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2006q3","YQ") | (year >= 2013 & date_q <= quarterly("2017q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+
+
+
+
+
+
+
+* assets
+reghdfe d1q_assets c.sm_shock##c.lev_mb_IQ_std lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2007q3","YQ") | (year >= 2014 & date_q <= quarterly("2018q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+reghdfe d2q_assets c.sm_shock##c.lev_mb_IQ_std lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2007q3","YQ") | (year >= 2014 & date_q <= quarterly("2018q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+reghdfe d3q_assets c.sm_shock##c.lev_mb_IQ_std lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2007q3","YQ") | (year >= 2014 & date_q <= quarterly("2018q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+* tot_liabilities
+reghdfe d1q_tot_liabilities c.sm_shock##c.lev_mb_IQ_std lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2007q3","YQ") | (year >= 2014 & date_q <= quarterly("2018q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+reghdfe d2q_tot_liabilities c.sm_shock##c.lev_mb_IQ_std lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2007q3","YQ") | (year >= 2014 & date_q <= quarterly("2018q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+reghdfe d3q_tot_liabilities c.sm_shock##c.lev_mb_IQ_std lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2007q3","YQ") | (year >= 2014 & date_q <= quarterly("2018q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+* networth
+reghdfe d1q_networth c.sm_shock##c.lev_mb_IQ_std lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2007q3","YQ") | (year >= 2014 & date_q <= quarterly("2018q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+reghdfe d2q_networth c.sm_shock##c.lev_mb_IQ_std lev_IQ $firmcontrols  ///
+if date_q <= quarterly("2007q3","YQ") | (year >= 2014 & date_q <= quarterly("2018q4","YQ")) & d_sample, absorb(YI_FE isin)
+
+* baseline with altppnet
+reghdfe d1q_altppnet c.sm_shock##c.lev_mb_IQ_std  $firmcontrols  if date_q <= quarterly("2007q3","YQ") & d_sample, absorb(YI_FE isin)
+
+		
+gen temp = 1
+gen leads=_n-1
+*sales ppnet profitability tot_liabilities
+forvalues tercile = 1/1{
+	local var = "ppnet"
+		
+	
+	display "################# Process variable `var' ########################"
+	
+	gen coef_`var'=.
+	gen se_`var'=.
+	gen ciub_`var'=.
+	gen cilb_`var'=.
+
+
+	replace coef_`var'=0 if leads==0
+	replace ciub_`var'=0 if leads==0
+	replace cilb_`var'=0 if leads==0
+
+	display "################# This is tercile `tercile' ########################"
+	
+	forvalues i=1/8{
+		
+		reghdfe d`i'q_`var' c.sm_shock##c.lev_mb_IQ_std  ///
+		$firmcontrols  if d_sample, absorb(YI_FE isin) 
+		
+		capture replace coef_`var'=_b[c.lev_mb_IQ_std#c.sm_shock] if leads==`i'
+		capture replace se_`var'=_se[c.lev_mb_IQ_std#c.sm_shock]  if leads==`i'
+		replace ciub_`var'=coef_`var' + 1.68*se_`var'  if leads==`i'
+		replace cilb_`var'=coef_`var' - 1.68*se_`var'  if leads==`i'
+	}
+}
+
+twoway  (rarea cilb_`var' ciub_`var' leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin)) ///
+(scatter coef_`var'  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(blue)), legend(order(1 "CI 90%")) ///
+yline(0,lp(dash) lc(gs10)) xtitle("Horizon (in quarters)",size(large)) ytitle("Change in NetPPE (in %)",size(large)) name(ppnet,replace)
+graph export ../../Analysis/output/Default_LP_PPENetTerciles.pdf,replace
+ 
+ 
+
+
+
 
 
 /*
@@ -238,9 +412,11 @@ restore
 merge m:1 isin `timeunit' using `FY_withinInd_tercile'
 drop _merge
 
+
+
 egen IQ_dummy = group(d2sic `timeunit')
 *assets sales ppnet profitability tot_liabilities 
-foreach var in assets sales ppnet profitability tot_liabilities  {
+foreach var in assets sales ppnet profitability tot_liabilities  altppnet netassets capoverassets{
 	forvalues i=1/8{
 		quietly areg d`i'q_`var',absorb(IQ_dummy)
 		predict d`i'q_`var'_res,residual
@@ -253,11 +429,12 @@ save ../data/Default_lp_q_balancesheet_terciles,replace
 ********************************************************************************
 
 use ../data/Default_lp_q_balancesheet_terciles,clear
-
-egen YI_FE = group(year d2sic)
+drop temp coef_*
+*egen YI_FE = group(year d2sic)
 
 *replace agg_shock_ois_q = agg_shock_JK_q_noinfo * 100
-keep if year > 2000 & date_q <= quarterly("2006q2","YQ") 
+keep if (year > 2000 & date_q <= quarterly("2006q2","YQ"))  //| (year > 2013 & date_q <= quarterly("2017q1","YQ"))
+*keep if  date_q <= quarterly("2006q3","YQ") | (date_q >= quarterly("2014q1","YQ") & date_q <= quarterly("2017q4","YQ"))
 // account for the leads reaching until 2007q4
 
 areg lev_mb_IQ,absorb(IQ_dummy)
@@ -269,17 +446,17 @@ predict fra_mb_IQ_res,res
 areg lev_IQ,absorb(isin)
 predict lev_IQ_res,res
 
-*replace agg_shock_ois_q = sm_shock
 
 
 
+*
 local nq = 3
 foreach var of varlist lev_mb_IQ_res{
 	di "########################################################################"
 	di "########################## Working on Variable `var' ###################"
 
 	gen q_`var'_help=.
-	forvalues y = 2001/2007 {	
+	foreach y of numlist  2001/2007 2014/2017{	
 		capture xtile q_help_`y' = `var' if year==`y' , nquantiles(`nq')
 		*tab q_help_`y'
 		capture replace q_`var'_help=q_help_`y' if year==`y'
@@ -293,14 +470,13 @@ foreach var of varlist lev_mb_IQ_res{
 	label values q_`var' label`var'
 
 }
-
-gen temp = 1
+	
+drop leads
 gen leads=_n-1
 *sales ppnet profitability tot_liabilities
 forvalues tercile = 1/1{
-	* assets ppnet sales  tot_liabilities
-	foreach var in  ppnet{ 
-	
+	local var = "ppnet"
+		
 	
 	display "################# Process variable `var' ########################"
 	
@@ -318,40 +494,28 @@ forvalues tercile = 1/1{
 	
 	forvalues i=1/8{
 		
-	reg d`i'q_ppnet_res c.agg_shock_ois_q#ibn.q_levmarketIQ_YI ibn.q_levmarketIQ_YI $firmcontrols l1_gdp_growth l2_gdp_growth 	l1_inflation_yoy  l1q_assets l2q_assets if  d_sample
+		reghdfe d`i'q_`var' c.sm_shock##c.lev_mb_IQ ///
+		 $firmcontrols l1_gdp_growth l2_gdp_growth lev_IQ 	///
+		l1_inflation_yoy  l1q_assets l2q_assets L1ppnet L2ppnet if  d_sample, absorb(YI_FE isin) cluster(year isin)
 		
-		*reghdfe d`i'q_`var'_res c.agg_shock_ois_q $firmcontrols l1q_assets l2q_assets l1_gdp_growth l1_inflation_yoy if  q_levmarketIQ_YI == `tercile', absorb(isin) cluster(date_q isin)
-		* q_levmarketIQ_YI q_lev_mb_IQ
-		*reghdfe d`i'q_`var' c.agg_shock_ois_q##c.lev_mb_IQ_res $firmcontrols l1_gdp_growth l2_gdp_growth l1_inflation_yoy  l1q_assets l2q_assets   if  d_sample ,absorb(isin year) 
-		
-		*
-		*reghdfe d`i'q_`var' c.agg_shock_ois_q##ibn.q_lev_mb_IQ $firmcontrols l1_gdp_growth l2_gdp_growth l1_inflation_yoy  l1q_assets l2q_assets  if d_sample ,absorb(isin YI_FE) 
-		
-		
-		*areg d`i'q_`var'_res c.agg_shock_ois_q $firmcontrols l1_gdp_growth l2_gdp_growth l1_inflation_yoy  l1q_assets l2q_assets  if  q_lev_mb_IQ == `tercile' & d_sample ,absorb(isin) 
-		
-		capture replace coef_`var'=_b[c.agg_shock_ois_q] if leads==`i'
-		capture replace se_`var'=_se[c.agg_shock_ois_q]  if leads==`i'
-		 replace ciub_`var'=coef_`var'+1.68*se_`var'  if leads==`i'
-		 replace cilb_`var'=coef_`var'-1.68*se_`var'  if leads==`i'
-		
-		*capture replace n_`var'_ter`tercile'=e(N) if leads == `i'
-		
-		}
+		capture replace coef_`var'=_b[c.lev_mb_IQ#c.sm_shock] if leads==`i'
+		capture replace se_`var'=_se[c.lev_mb_IQ#c.sm_shock]  if leads==`i'
+		replace ciub_`var'=coef_`var'+1.68*se_`var'  if leads==`i'
+		replace cilb_`var'=coef_`var'-1.68*se_`var'  if leads==`i'
 	}
 }
 
-
-twoway  (rarea cilb_ppnet ciub_ppnet leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin)) ///
-(scatter coef_ppnet  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(blue)), name(agg_response,replace) 
- 
- 
+twoway  (rarea cilb_`var' ciub_`var' leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin)) ///
+(scatter coef_`var'  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(blue)), legend(order(1 "CI 90%")) ///
+yline(0,lp(dash) lc(gs10)) xtitle("Horizon (in quarters)",size(large)) ytitle("Change in NetPPE (in %)",size(large)) name(ppnet,replace)
+graph export ../../Analysis/output/Default_LP_PPENetTerciles.pdf,replace
  
  
  forvalues tercile = 1/1{
 	* assets ppnet sales  tot_liabilities
 	foreach var in  ppnet{ 
 	
+	local shock = "sm_shock"
 	
 	display "################# Process variable `var' ########################"
 	
@@ -378,18 +542,18 @@ twoway  (rarea cilb_ppnet ciub_ppnet leads if leads>=0 & leads<=6, sort  color(b
 	
 	forvalues i=1/8{
 			
-		reg d`i'q_ppnet_res c.agg_shock_ois_q#ibn.q_levmarketIQ_YI ///
+		reg d`i'q_ppnet_res c.sm_shock#ibn.q_levmarketIQ_YI ///
 		ibn.q_levmarketIQ_YI $firmcontrols l1_gdp_growth l2_gdp_growth 	///
 		l1_inflation_yoy  l1q_assets l2q_assets if  d_sample
 		
 
-		capture replace coef_`var'1=_b[1.q_levmarketIQ_YI#agg_shock_ois_q] if leads==`i'
-		capture replace se_`var'1=_se[1.q_levmarketIQ_YI#agg_shock_ois_q]  if leads==`i'
+		capture replace coef_`var'1=_b[1.q_levmarketIQ_YI#`shock'] if leads==`i'
+		capture replace se_`var'1=_se[1.q_levmarketIQ_YI#`shock']  if leads==`i'
 		replace ciub_`var'1=coef_`var'1+1.68*se_`var'1  if leads==`i'
 		replace cilb_`var'1=coef_`var'1-1.68*se_`var'1  if leads==`i'
 			
-		capture replace coef_`var'3=_b[3.q_levmarketIQ_YI#agg_shock_ois_q] if leads==`i'
-		capture replace se_`var'3=_se[3.q_levmarketIQ_YI#agg_shock_ois_q]  if leads==`i'
+		capture replace coef_`var'3=_b[3.q_levmarketIQ_YI#`shock'] if leads==`i'
+		capture replace se_`var'3=_se[3.q_levmarketIQ_YI#`shock']  if leads==`i'
 		replace ciub_`var'3=coef_`var'3+1.68*se_`var'3  if leads==`i'
 		replace cilb_`var'3=coef_`var'3-1.68*se_`var'3  if leads==`i'
 			
@@ -398,23 +562,48 @@ twoway  (rarea cilb_ppnet ciub_ppnet leads if leads>=0 & leads<=6, sort  color(b
 		}
 	}
 }
- 
+
+/*
+forvalues i=1/8{
+		winsor2 d`i'q_altppnet,cut(2 98) replace
+		reghdfe d`i'q_altppnet c.agg_shock_ois_q ///
+		 $firmcontrols l1_gdp_growth l2_gdp_growth 	///
+		l1_inflation_yoy  l1q_assets l2q_assets if  d_sample,absorb(YI_FE)
+}
+
+forvalues i=1/8{
+		winsor2 d`i'q_altppnet_res,cut(2 98) replace
+		reg d`i'q_altppnet_res c.agg_shock_ois_q#ibn.q_levmarketIQ_YI ///
+		 $firmcontrols l1_gdp_growth l2_gdp_growth 	///
+		l1_inflation_yoy  l1q_assets l2q_assets if  d_sample & date_q 
+}
+*/
  
 
- twoway  (rarea cilb_ppnet1 ciub_ppnet1 leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin)) ///
+ 
+
+twoway  (rarea cilb_ppnet1 ciub_ppnet1 leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin)) ///
+(scatter coef_ppnet1  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(blue))  ///
+(rarea cilb_ppnet3 ciub_ppnet3 leads if leads>=0 & leads<=6, sort  color(red%10) lw(vvthin)) ///
+(scatter coef_ppnet3  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(red)), ///
+ yline(0,lp(dash) lc(gs10)) ///
+legend(order( 2 "Low Bond Leverage" 4 "High Bond Leverage" 1 "CI Tercile Low"  3 "CI Tercile High"  )) ///
+xtitle("Horizon (in quarters)",size(large)) ytitle("Change in NetPPE (in %)",size(large)) name(ppnet,replace)
+graph export ../../Analysis/output/Default_LP_PPENetTerciles.pdf,replace
+*ylabel(-2(0.5)2)
+  twoway  (rarea cilb_ppnet1 ciub_ppnet1 leads if leads>=0 & leads<=6, sort  color(blue%10) lw(vvthin)) ///
 (scatter coef_ppnet1  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(blue))  ///
  (rarea cilb_ppnet3 ciub_ppnet3 leads if leads>=0 & leads<=6, sort  color(red%10) lw(vvthin)) ///
  (scatter coef_ppnet3  leads if leads>=0 & leads<=6,c( l) lp(solid) mc(red)), ///
-ylabel(-2(0.5)2) yline(0,lp(dash) lc(gs10)) ///
+ yline(0,lp(dash) lc(gs10)) ///
 legend(order( 2 "Low Bond Leverage" 4 "High Bond Leverage" 1 "CI Tercile Low"  3 "CI Tercile High"  )) ///
-xtitle("Horizon (in quaters)",size(large)) ytitle("Change in NetPPE (in %)",size(large)) name(ppnet,replace)
+xtitle("Horizon (in quarters)",size(large)) ytitle("Change in NetPPE (in %)",size(large)) name(ppnet,replace)
 graph export ../../Analysis/output/Default_LP_PPENetTerciles.pdf,replace
 
  
  
- 
 
-********************************************************************************
+*/*******************************************************************************
 
 	*** Altavilla et al. shock
 import excel using ../../Raw_Data/original/Dataset_EA-MPD.xlsx, clear sheet("Press Release Window") firstrow
