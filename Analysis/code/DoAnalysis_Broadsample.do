@@ -1,6 +1,7 @@
 clear
 
 global path = "/Users/olivergiesecke/Dropbox/Firm & Monetary Policy/Extra_Analysis"
+global overleaf "/Users/olivergiesecke/Dropbox/Apps/Overleaf/Firms and Monetary Policy/tables_figures"
 
 cd "$path"
 
@@ -321,7 +322,7 @@ reghdfe ln_return c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ  $firmcontrols if (date_q >= 
 *** Table Debt structure - Broadest Sample and Long Period
 ***********************************************************
 
-use aux_data_equityresponse,clear
+use aux_data_equityresponse, clear
 est clear
 
 replace ln_return = ln_return * 10000
@@ -331,10 +332,11 @@ drop if OIS_1M ==.
 drop tag_IY 
 egen tag_IY = tag(gvkey year)
 
+global firmcontrols "cash_at log_at tang log_bookmkt intrcov profitability intr_td"
+global controlinteractions "c.OIS_1M#c.cash_at c.OIS_1M#c.log_at c.OIS_1M#c.tang c.OIS_1M#c.log_bookmkt c.OIS_1M#c.intrcov c.OIS_1M#c.profitability c.OIS_1M#c.intr_td"
 
 reghdfe ln_return c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ  $firmcontrols, absorb(gvkey i.ind_group#i.date) cluster(gvkey date)
 gen prevsample = e(sample)
-
 
 egen tag_fim = tag(gvkey) if prevsample
 tab tag_fim
@@ -365,7 +367,7 @@ replace mb_issuer_IQ = 1 if lev_mb_IQ > 0  & lev_mb_IQ!=.
 gen bondtimesshock = mb_issuer_IQ * OIS_1M
 label var bondtimesshock "$\Delta$ OIS $\times$ Bond outstanding"
 label var mb_issuer_IQ "Bond outstanding"
-reghdfe ln_return bondtimesshock  mb_issuer_IQ   $firmcontrols if prevsample, absorb(gvkey i.ind_group#i.date) cluster(gvkey date)
+reghdfe ln_return bondtimesshock  mb_issuer_IQ $firmcontrols if prevsample, absorb(gvkey i.ind_group#i.date) cluster(gvkey date)
 est store b3
 estadd local DC "\checkmark"
 estadd local FE "\checkmark"
@@ -485,14 +487,28 @@ estadd local CLEV "\checkmark"
 	*MAKE TABLE
 #delimit;
 esttab  b2 b3 b4 b5 b6 b7 b8 b1
-		using "BS_Firm_DebtStructure.tex", 
+		using "$overleaf/BS_Firm_DebtStructure.tex", 
 		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  ///
 		noconstant  nomtitles nogaps obslast booktabs  nonotes ///
-		scalar("DC Duration control" "FE Firm FE" "CT Firm controls" "IS Sector $\times$ Date FE" "CLEV Lev. Quintile Interaction") 
-		drop(cash_at log_at tang  log_bookmkt intrcov profitability intr_td _cons *.d_lev_IQ#c.OIS_1M *.d_lev_IQ  *.q_lev_mb_IQ *.q_fra_mb_IQ 1.q_lev_mb_IQ#c.OIS_1M 1.q_fra_mb_IQ#c.OIS_1M OIS_1M)
+		scalar("FE Firm FE" "CT Firm controls" "DC Firm control x shock" "IS Sector $\times$ Date FE" "CLEV Lev. Quintile Interaction") 
+		drop(cash_at log_at tang  log_bookmkt intrcov profitability intr_td _cons *.d_lev_IQ#c.OIS_1M *.d_lev_IQ  *.q_lev_mb_IQ *.q_fra_mb_IQ 1.q_lev_mb_IQ#c.OIS_1M 1.q_fra_mb_IQ#c.OIS_1M OIS_1M )
 		order( c.OIS_1M#c.lev_mb_IQ lev_mb_IQ  bondtimesshock  mb_issuer_IQ *.q_lev_mb_IQ#c.OIS_1M c.OIS_1M#c.fra_mb_IQ c.OIS_1M#c.lev_IQ fra_mb_IQ lev_IQ )
 		label substitute(\_ _);
 #delimit cr
+
+
+	*MAKE TABLE
+#delimit;
+esttab  b2 b3 b4 b5 b6 b7 b8
+		using "$overleaf/BS_Firm_DebtStructurePres.tex", 
+		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  ///
+		noconstant  nomtitles nogaps obslast booktabs  nonotes ///
+		scalar("FE Firm FE" "CT Firm controls" "DC Firm control x shock" "IS Sector $\times$ Date FE" "CLEV Lev. Quintile Interaction") 
+		drop(cash_at log_at tang  log_bookmkt intrcov profitability intr_td _cons *.d_lev_IQ#c.OIS_1M *.d_lev_IQ  *.q_lev_mb_IQ *.q_fra_mb_IQ 1.q_lev_mb_IQ#c.OIS_1M 1.q_fra_mb_IQ#c.OIS_1M OIS_1M )
+		order( c.OIS_1M#c.lev_mb_IQ lev_mb_IQ  *.q_lev_mb_IQ#c.OIS_1M c.OIS_1M#c.fra_mb_IQ c.OIS_1M#c.lev_IQ fra_mb_IQ lev_IQ )
+		label substitute(\_ _);
+#delimit cr
+
 
 ********************************************************************************
 
@@ -607,6 +623,7 @@ reghdfe d2q_altppentq c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ_std  ///
 	$firmcontrols  , absorb(YI_FE gvkey) cluster(date_q d2sic)
 gen d_sample = e(sample)
 	
+/*
 forvalues h = 1/6{
 	di "Horizon: `h'"
 	reghdfe d`h'q_altppentq c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ_std  ///
@@ -614,6 +631,17 @@ forvalues h = 1/6{
 	est store inv`h'
 	estadd local FE "Ind2d $\times$ Date"
 	estadd local CT "\checkmark"
+	estadd local CL "Ind2d $\times$ Date"
+}
+*/
+
+forvalues h = 1/6{
+	di "Horizon: `h'"
+	reghdfe d`h'q_altppentq c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ_std  ///
+	c.sm_shock##c.cash_at c.sm_shock##c.log_at c.sm_shock##c.tang c.sm_shock##c.bookmkt c.sm_shock##c.intrcov c.sm_shock##c.profitability c.sm_shock##c.intr_td , absorb(YI_FE gvkey) cluster(date_q gvkey)
+	est store inv`h'
+	estadd local FE "Ind2d $\times$ Date"
+	estadd local CT "controls x shock"
 	estadd local CL "Ind2d $\times$ Date"
 }
 
@@ -651,9 +679,12 @@ forvalues tercile = 1/1{
 	display "################# This is tercile `tercile' ########################"
 	
 	forvalues h=1/8{
-		reghdfe d`h'q_`var' c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ_std  ///
-		$firmcontrols, absorb(YI_FE gvkey)
+		*reghdfe d`h'q_`var' c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ_std  ///
+		*$firmcontrols, absorb(YI_FE gvkey)
 		
+		reghdfe d`h'q_altppentq c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ_std  ///
+		c.sm_shock##c.cash_at c.sm_shock##c.log_at c.sm_shock##c.tang c.sm_shock##c.bookmkt c.sm_shock##c.intrcov c.sm_shock##c.profitability c.sm_shock##c.intr_td , absorb(YI_FE gvkey) cluster(date_q gvkey)
+	
 		capture replace coef_`var'=_b[c.lev_mb_IQ_std#c.sm_shock] if leads==`h'
 		capture replace se_`var'=_se[c.lev_mb_IQ_std#c.sm_shock]  if leads==`h'
 		replace ciub_`var'=coef_`var' + 1.68*se_`var'  if leads==`h'
@@ -747,9 +778,23 @@ esttab  inv1 inv2 inv3 inv4 inv5 inv6
 #delimit cr
 
 
+***********************************************************
+*** Table Debt structure - Broadest Sample and Long Period
+***********************************************************
 
-	
+use aux_data_equityresponse,clear
+est clear
 
+replace ln_return = ln_return * 10000
+
+keep if date_q <= quarterly("2007q3","YQ") | (date_q >= quarterly("2013q1","YQ") & date_q <= quarterly("2018q4","YQ"))
+drop if OIS_1M ==.
+drop tag_IY 
+egen tag_IY = tag(gvkey year)
+
+global firmcontrols "cash_at log_at tang bookmkt intrcov profitability intr_td"
+
+reghdfe ln_return c.OIS_1M#c.lev_mb_IQ c.lev_mb_IQ  $firmcontrols, absorb(gvkey i.ind_group#i.date) cluster(gvkey date)
 
 
 

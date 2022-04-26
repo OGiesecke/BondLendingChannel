@@ -235,7 +235,8 @@ foreach var of varlist lev_mb_IQ dtd lev_IQ fra_mb_IQ{
 label var sm_shock "MP Shock"
 label var lev_mb_IQ_std "Bond over Assets"
 label var lev_IQ_std "Debt over Assets"
-	
+
+/*
 forvalues h = 1/6{
 	di "Horizon: `h'"
 	reghdfe d`h'q_altppnet c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ_std  ///
@@ -246,6 +247,20 @@ forvalues h = 1/6{
 	estadd local CT "\checkmark"
 	estadd local CL "Ind2d $\times$ Date"
 }
+*/
+
+
+forvalues h = 1/6{
+	di "Horizon: `h'"
+	reghdfe d`h'q_altppnet c.sm_shock##c.lev_mb_IQ_std c.sm_shock##c.lev_IQ_std  ///
+	c.sm_shock##c.size c.sm_shock##c.cash_oa c.sm_shock##c.profitability c.sm_shock##c.tangibility c.sm_shock##c.log_MB c.sm_shock##c.DTI c.sm_shock##c.cov_ratio if date_q <= quarterly("2006q1","YQ")  | (year >= 2013 & date_q <= quarterly("2017q1","YQ")) ///
+	& d_sample , absorb(YI_FE isin) cluster(date_q isin)
+	est store inv`h'
+	estadd local FE "Ind2d $\times$ Date"
+	estadd local CT "controls x shock"
+	estadd local CL "Ind2d $\times$ Date"
+}
+
 
 	*MAKE TABLE
 #delimit;
@@ -253,7 +268,7 @@ esttab  inv1 inv2 inv3 inv4 inv5 inv6
 		using "../../Extra_Analysis/Default_Firm_Investment.tex", 
 		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  
 		noconstant   nogaps obslast booktabs  nonotes 
-		scalar("FE Fixed Effects" "CT Firm controls" "CL Cluster-SE") 
+		scalar("FE Fixed Effects" "CT Controls" "CL Cluster-SE") 
 		mtitles("t+1" "t+2" "t+3" "t+4" "t+5" "t+6")
 		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio sm_shock _cons)
 		order(c.sm_shock#c.lev_mb_IQ_std lev_mb_IQ_std c.sm_shock#c.lev_IQ_std  lev_IQ_std )

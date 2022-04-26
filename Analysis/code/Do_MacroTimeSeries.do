@@ -65,7 +65,7 @@ gen a =2000
 gen b =6000
 
 twoway (rarea  a b  date_q if  date_q >= quarterly("2001Q1","YQ") & date_q <= quarterly("2007Q3","YQ"),col(gs8) fi( inten40) lwidth(vvthin)) ///
-(rarea  a b  date_q if  date_q >= quarterly("2013Q1","YQ") ,col(gs14) fi( inten40) lwidth(vvthin)) ///
+(rarea  a b  date_q if  date_q >= quarterly("2013Q1","YQ") , col(gs14) fi( inten40) lwidth(vvthin)) ///
 (scatter vol_defl date_q ,c(l) mc(red) ms(oh) ytitle("Loans out. (in bn 2015 EUR)")) ///
 (scatter year_loan_spread date_q ,c(l) mc(blue) ms(sh) yaxis(2) ytitle("Avg. 5yr loan rate - 5 yr Bund (in %)",axis(2))),	///
 xlabel(,format(%tqCCYY)) xtitle("Year") legend(order(3 "Loans outstanding (LHS)" 4 "Loan spread (RHS)" 1 "Baseline Sample" 2 "Post-Crisis Sample")) 
