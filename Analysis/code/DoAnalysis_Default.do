@@ -1121,8 +1121,8 @@ esttab  b1 b2 b3 b4 b5
 		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  noconstant  nomtitles nogaps
 		obslast booktabs  nonotes 
 		scalar("FE Firm FE" "CT Firm controls" "DC Firm controls x shock" "IS Sector $\times$ Date FE")
-		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons  lev_mb_IQ    fra_mb_IQ lev_IQ)
-			order(c.eureon3m_hf#c.lev_mb_IQ lev_mb_IQ *.q_lev_mb_IQ#c.eureon3m_hf c.eureon3m_hf#c.fra_mb_IQ fra_mb_IQ c.eureon3m_hf#c.lev_IQ lev_IQ *.q_fra_mb_IQ#c.eureon3m_hf  )
+		drop(*.q_lev_mb_IQ *.q_fra_mb_IQ 1.q_lev_mb_IQ#c.eureon3m_hf 1.q_fra_mb_IQ#c.eureon3m_hf  size cash_oa profitability tangibility log_MB DTI cov_ratio _cons eureon3m_hf c.OIS_1M#c.size c.OIS_1M#c.cash_oa c.OIS_1M#c.profitability c.OIS_1M#c.tangibility c.OIS_1M#c.log_MB c.OIS_1M#c.DTI c.OIS_1M#c.cov_ratio)
+		order(c.eureon3m_hf#c.lev_mb_IQ lev_mb_IQ *.q_lev_mb_IQ#c.eureon3m_hf c.eureon3m_hf#c.fra_mb_IQ fra_mb_IQ c.eureon3m_hf#c.lev_IQ lev_IQ *.q_fra_mb_IQ#c.eureon3m_hf  )
 		label substitute(\_ _);
 #delimit cr
 
@@ -1353,20 +1353,20 @@ esttab   b2 b3 b4 b5 b6 b7 b8 b1
 		label substitute(\_ _);
 #delimit cr
 
-
-/*
-	*MAKE PRESENTATION TABLE
+	*MAKE TABLE
 #delimit;
-esttab   b2 b4 b5 b6 b7 
-		using "$overleaf/Default_FirmRobCAPMPres.tex", 
+esttab   b2  b4 b5 b6 b7 
+		using "$overleaf/Default_Firm_RobCAPMPres.tex", 
 		replace compress b(a3) se(a3) r2  star(* 0.10 ** 0.05 *** 0.01 )  noconstant  nomtitles nogaps
-		obslast booktabs  nonotes
-		scalar("DC Duration control" "FE Firm FE" "CT Firm controls" "IS Sector $\times$ Date FE" "CLEV Lev. Quintile Interaction")
-		drop(size cash_oa profitability tangibility log_MB DTI q_fra_mb_IQ fra_mb_IQ cov_ratio _cons lev_IQ lev_mb_IQ q_lev_mb_IQ c.OIS_1M#c.dur_proxy dur_proxy)
-		order(c.OIS_1M#c.lev_mb_IQ c.OIS_1M#c.q_lev_mb_IQ c.OIS_1M#c.fra_mb_IQ c.OIS_1M#c.q_fra_mb_IQ)
+		obslast booktabs  nonotes 
+		scalar("FE Firm FE" "CT Firm controls" "DC Firm controls x shock" "IS Sector $\times$ Date FE" "CLEV Lev. Quintile Interaction")
+		drop(size cash_oa profitability tangibility log_MB DTI cov_ratio _cons *.d_lev_IQ#c.OIS_1M *.d_lev_IQ *.q_lev_mb_IQ *.q_fra_mb_IQ 1.q_lev_mb_IQ#c.OIS_1M 1.q_fra_mb_IQ#c.OIS_1M OIS_1M c.OIS_1M#c.size c.OIS_1M#c.cash_oa c.OIS_1M#c.profitability c.OIS_1M#c.tangibility c.OIS_1M#c.log_MB c.OIS_1M#c.DTI c.OIS_1M#c.cov_ratio)
+		order( c.OIS_1M#c.lev_mb_IQ lev_mb_IQ  bondtimesshock  mb_issuer_IQ *.q_lev_mb_IQ#c.OIS_1M c.OIS_1M#c.fra_mb_IQ c.OIS_1M#c.lev_IQ fra_mb_IQ lev_IQ )
 		label substitute(\_ _);
 #delimit cr
-*/
+
+
+
 
 ***********************************************************
 *** Robustness: Table Debt structure - Full Sample
@@ -2276,7 +2276,7 @@ esttab   b2 b3 b4 b5 b6 b7 b8 b1
 global additionaldatapath = "/Users/olivergiesecke/Dropbox/Firm & Monetary Policy/Extra_Analysis"
 
 est clear
-import delimited "../../Raw_Data/original/dailydataset.csv",clear
+import delimited "../Raw_Data/original/dailydataset.csv",clear
 gen statadate = date(date,"YMD")
 format statadate %td
 drop date
@@ -2284,7 +2284,7 @@ rename statadate date
 tempfile factors
 save `factors'
 
-use ../../Int_Data/data/Default_stock_return_ext.dta,clear
+use "../Int_Data/data/Default_stock_return_ext.dta",clear
 keep date isin return2d
 replace return2d = return2d * 10000
 tempfile twodaywindow
@@ -2300,7 +2300,7 @@ save `twodaywindow'
 
 	***
 
-use ../data/Firm_Return_WS_Bond_Duration_Data_Default_Sample,clear
+use "../Analysis/data/Firm_Return_WS_Bond_Duration_Data_Default_Sample",clear
 *keep if date < date("01082007","DMY") & year > 2000
 gen fullsample = date < date("01082007","DMY") & year > 2000
 replace  fullsample  = 1 if year < 2019 & year > 2012
@@ -2497,7 +2497,7 @@ esttab b1 b2 b3 b4
 		nogaps nomtitles obslast booktabs  nonotes 
 		scalar("FE Firm FE" "CT Firm controls" "DC Firm controls x shock" "IS Sector $\times$ Date FE")
 		keep(c.OIS_1M#c.lev_mb_IQ lev_mb_IQ c.OIS_1M#c.w_maturity w_maturity c.OIS_1M#c.share_floatingrate share_floatingrate c.conffactor2#c.w_maturity c.conffactor2#c.share_floatingrate c.OIS_1M#c.exposure c.conffactor2#c.exposure exposure )
-		order(c.OIS_1M#c.lev_mb_IQ lev_mb_IQ c.OIS_1M#c.lev_IQ lev_IQ c.OIS_1M#c.w_maturity c.conffactor2#c.w_maturity w_maturity c.OIS_1M#c.share_floatingrate c.conffactor2#c.share_floatingrate share_floatingrate c.OIS_1M#c.exposure c.conffactor2#c.exposure exposure)
+		order(c.OIS_1M#c.lev_mb_IQ lev_mb_IQ c.OIS_1M#c.w_maturity c.conffactor2#c.w_maturity w_maturity c.OIS_1M#c.share_floatingrate c.conffactor2#c.share_floatingrate share_floatingrate c.OIS_1M#c.exposure c.conffactor2#c.exposure exposure)
 		label substitute(\_ _);
 #delimit cr
 
